@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
+import { useAuth } from '../auth'
 import { LoadingSpinner } from '../components/Shared'
 import type { DomainConfig } from '../types'
-import { Globe, Activity, Upload } from 'lucide-react'
+import { Globe, Activity, Upload, Lock } from 'lucide-react'
 import clsx from 'clsx'
 
 const SENSITIVITY_COLORS: Record<string, string> = {
@@ -12,6 +13,7 @@ const SENSITIVITY_COLORS: Record<string, string> = {
 }
 
 export default function Domains() {
+  const { can } = useAuth()
   const [domains, setDomains] = useState<DomainConfig[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -32,6 +34,16 @@ export default function Domains() {
     return () => { cancelled = true }
   }, [])
 
+  if (!can('view_domains')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+        <Lock size={48} className="mb-4" />
+        <h2 className="text-lg font-semibold text-gray-600">Access Restricted</h2>
+        <p className="text-sm mt-1">Domain configuration requires Administrator or CISO access.</p>
+      </div>
+    )
+  }
+
   if (loading) return <LoadingSpinner />
 
   return (
@@ -43,9 +55,11 @@ export default function Domains() {
             YAML-driven domain adapters — configure signal mappings per vertical
           </p>
         </div>
-        <button className="btn-primary flex items-center gap-2">
-          <Upload size={16} /> Upload YAML
-        </button>
+        {can('manage_domains') && (
+          <button className="btn-primary flex items-center gap-2">
+            <Upload size={16} /> Upload YAML
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

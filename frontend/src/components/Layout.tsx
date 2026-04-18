@@ -1,5 +1,5 @@
-import { Outlet, NavLink } from 'react-router-dom'
-import { useAuth } from '../auth'
+import { Outlet, NavLink, Navigate, useLocation } from 'react-router-dom'
+import { useAuth, NAV_ACCESS } from '../auth'
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -38,6 +38,19 @@ const ROLE_LABELS: Record<UserRole, string> = {
 export default function Layout() {
   const { role, setRole } = useAuth()
   const [roleOpen, setRoleOpen] = useState(false)
+  const location = useLocation()
+
+  // Route guard: redirect to dashboard if user navigates to a restricted page
+  const currentPath = location.pathname
+  const allowedRoles = NAV_ACCESS[currentPath]
+  if (allowedRoles && !allowedRoles.includes(role)) {
+    return <Navigate to="/" replace />
+  }
+
+  const visibleNav = NAV_ITEMS.filter(({ to }) => {
+    const roles = NAV_ACCESS[to]
+    return !roles || roles.includes(role)
+  })
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -59,7 +72,7 @@ export default function Layout() {
           </div>
 
           <nav className="flex-1 py-4 space-y-0.5 px-3">
-            {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+            {visibleNav.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}

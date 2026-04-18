@@ -40,7 +40,7 @@ const DEMO_ALERTS: Alert[] = [
 ]
 
 export default function AlertCenter() {
-  const { role } = useAuth()
+  const { role, can } = useAuth()
   const [alerts, setAlerts] = useState<Alert[]>(DEMO_ALERTS)
   const [filter, setFilter] = useState<AlertLevel | 'all'>('all')
   const [loading, setLoading] = useState(false)
@@ -147,7 +147,7 @@ export default function AlertCenter() {
                 </div>
 
                 <div className="flex flex-col gap-2 shrink-0">
-                  {!alert.acknowledged && !alert.resolved && (
+                  {!alert.acknowledged && !alert.resolved && can('acknowledge_alert') && (
                     <button
                       onClick={() => handleAcknowledge(alert.alert_id)}
                       className="btn-secondary flex items-center gap-1.5 text-xs"
@@ -155,7 +155,7 @@ export default function AlertCenter() {
                       <Eye size={14} /> Acknowledge
                     </button>
                   )}
-                  {!alert.resolved && (
+                  {!alert.resolved && can('resolve_alert') && (
                     <button
                       onClick={() => handleResolve(alert.alert_id)}
                       className="btn-primary flex items-center gap-1.5 text-xs"
@@ -165,6 +165,9 @@ export default function AlertCenter() {
                   )}
                   {alert.resolved && (
                     <span className="text-xs text-green-600 font-medium">Resolved</span>
+                  )}
+                  {!can('acknowledge_alert') && !alert.resolved && (
+                    <span className="text-xs text-gray-400 italic">View only</span>
                   )}
                 </div>
               </div>

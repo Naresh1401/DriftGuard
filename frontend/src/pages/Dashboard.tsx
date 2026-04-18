@@ -100,7 +100,7 @@ const DEMO_PATTERN_DIST = [
 ]
 
 export default function Dashboard() {
-  const { role } = useAuth()
+  const { role, can } = useAuth()
   const [health, setHealth] = useState<HealthScore>(DEMO_HEALTH)
   const [alerts, setAlerts] = useState<Alert[]>(DEMO_ALERTS)
   const [loading, setLoading] = useState(false)
@@ -254,9 +254,9 @@ export default function Dashboard() {
                   <span className="text-xs text-gray-500">{alert.department}</span>
                 </div>
                 <p className="text-sm text-gray-700 line-clamp-2">
-                  {role === 'ciso' ? alert.plain_language : alert.plain_language}
+                  {alert.plain_language}
                 </p>
-                {role === 'ciso' && (
+                {can('view_nist_detail') && (
                   <p className="text-xs text-gray-500 mt-1">
                     NIST: {alert.nist_controls.join(', ')} · Confidence: {(alert.confidence * 100).toFixed(0)}%
                   </p>

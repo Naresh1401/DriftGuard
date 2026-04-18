@@ -60,8 +60,14 @@ const WEEKLY_SUMMARY = {
 type ReportTab = 'weekly' | 'nist' | 'board'
 
 export default function Reports() {
-  const { role } = useAuth()
+  const { role, can } = useAuth()
   const [tab, setTab] = useState<ReportTab>('weekly')
+
+  const tabs = [
+    { key: 'weekly' as const, label: 'Weekly Summary', icon: BarChart3, perm: 'view_reports_weekly' as const },
+    { key: 'nist' as const, label: 'NIST Risk Matrix', icon: Shield, perm: 'view_reports_nist' as const },
+    { key: 'board' as const, label: 'Board Summary', icon: FileText, perm: 'view_reports_board' as const },
+  ].filter(({ perm }) => can(perm))
 
   return (
     <div className="space-y-6">
@@ -78,11 +84,7 @@ export default function Reports() {
 
       {/* Report tabs */}
       <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
-        {([
-          { key: 'weekly', label: 'Weekly Summary', icon: BarChart3 },
-          { key: 'nist', label: 'NIST Risk Matrix', icon: Shield },
-          { key: 'board', label: 'Board Summary', icon: FileText },
-        ] as const).map(({ key, label, icon: Icon }) => (
+        {tabs.map(({ key, label, icon: Icon }) => (
           <button
             key={key}
             onClick={() => setTab(key)}

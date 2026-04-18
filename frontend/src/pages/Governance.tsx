@@ -3,7 +3,7 @@ import { api } from '../api'
 import { useAuth } from '../auth'
 import { LoadingSpinner, EmptyState } from '../components/Shared'
 import type { GovernanceAction } from '../types'
-import { Shield, CheckCircle, XCircle, Clock, FileText } from 'lucide-react'
+import { Shield, CheckCircle, XCircle, Clock, FileText, Lock } from 'lucide-react'
 import clsx from 'clsx'
 
 const GATE_LABELS: Record<string, string> = {
@@ -48,7 +48,7 @@ const DEMO_AUDIT = [
 ]
 
 export default function Governance() {
-  const { role } = useAuth()
+  const { can } = useAuth()
   const [actions, setActions] = useState<GovernanceAction[]>(DEMO_ACTIONS)
   const [loading, setLoading] = useState(false)
   const [tab, setTab] = useState<'gates' | 'audit'>('gates')
@@ -66,6 +66,16 @@ export default function Governance() {
     load()
     return () => { cancelled = true }
   }, [])
+
+  if (!can('view_governance')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+        <Lock size={48} className="mb-4" />
+        <h2 className="text-lg font-semibold text-gray-600">Access Restricted</h2>
+        <p className="text-sm mt-1">Governance requires Compliance Officer, NI Architect, CISO, or Administrator access.</p>
+      </div>
+    )
+  }
 
   if (loading) return <LoadingSpinner />
 
@@ -132,7 +142,7 @@ export default function Governance() {
                       .join(' · ')}
                   </p>
                 </div>
-                {action.status === 'pending' && (role === 'ciso' || role === 'ni_architect' || role === 'admin') && (
+                {action.status === 'pending' && can('approve_governance') && (
                   <div className="mt-3 flex gap-2">
                     <button className="btn-primary text-xs flex items-center gap-1">
                       <CheckCircle size={14} /> Approve
