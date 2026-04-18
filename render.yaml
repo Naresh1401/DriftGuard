@@ -14,7 +14,7 @@ services:
       - key: DATABASE_URL
         value: sqlite+aiosqlite:///./driftguard.db
       - key: CORS_ORIGINS
-        value: https://driftguard.onrender.com
+        value: https://driftguard.vercel.app,https://driftguard-naresh1401.vercel.app,https://driftguard-api.onrender.com
       - key: PYTHON_VERSION
         value: 3.11.6
 

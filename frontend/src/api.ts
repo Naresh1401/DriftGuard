@@ -1,4 +1,5 @@
-const BASE = '/api/v1'
+const API_HOST = import.meta.env.VITE_API_URL || ''
+const BASE = `${API_HOST}/api/v1`
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('driftguard_token')

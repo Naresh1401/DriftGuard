@@ -16,7 +16,6 @@ import type {
   Alert,
   HealthScore,
   DriftPattern,
-  AlertLevel,
 } from '../types'
 import { api } from '../api'
 import { Activity, Shield, AlertTriangle, TrendingDown } from 'lucide-react'
