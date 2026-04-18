@@ -2,8 +2,8 @@ import { useEffect, useState, useRef } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { LoadingSpinner } from '../components/Shared'
-import type { DomainConfig } from '../types'
-import { Globe, Activity, Upload, Lock, X, ChevronDown, ChevronUp, CheckCircle, AlertCircle } from 'lucide-react'
+import type { DomainConfig, BreachAnalysis } from '../types'
+import { Globe, Activity, Upload, Lock, X, ChevronDown, ChevronUp, CheckCircle, AlertCircle, Search, Shield, ShieldAlert, ShieldCheck, ExternalLink } from 'lucide-react'
 import clsx from 'clsx'
 
 const SENSITIVITY_COLORS: Record<string, string> = {
@@ -30,6 +30,10 @@ export default function Domains() {
   const [showUpload, setShowUpload] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [expandedDetail, setExpandedDetail] = useState<DomainConfig | null>(null)
+  const [analyzeUrl, setAnalyzeUrl] = useState('')
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analysis, setAnalysis] = useState<BreachAnalysis | null>(null)
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null)
 
   const loadDomains = async () => {
     setLoading(true)
@@ -62,6 +66,23 @@ export default function Domains() {
     }
   }
 
+  const handleAnalyze = async () => {
+    let url = analyzeUrl.trim()
+    if (!url) return
+    if (!/^https?:\/\//i.test(url)) url = 'https://' + url
+    setAnalyzing(true)
+    setAnalysis(null)
+    setAnalyzeError(null)
+    try {
+      const result = await api.analyzeUrl(url)
+      setAnalysis(result)
+    } catch (err) {
+      setAnalyzeError(err instanceof Error ? err.message : 'Analysis failed')
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
   if (!can('view_domains')) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-gray-400">
@@ -89,6 +110,60 @@ export default function Domains() {
           </button>
         )}
       </div>
+
+      {/* ── Breach Analyzer ──────────────────────────────── */}
+      <div className="card border border-gray-200">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="p-2 rounded-lg bg-red-50">
+            <ShieldAlert size={20} className="text-red-600" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Website Breach Analyzer</h2>
+            <p className="text-xs text-gray-500">Enter a URL to analyze its security posture — SSL, headers, cookies, NIST mapping</p>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <div className="flex-1 relative">
+            <input
+              type="text"
+              value={analyzeUrl}
+              onChange={(e) => setAnalyzeUrl(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
+              placeholder="https://example.com"
+              className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-drift-500 focus:border-drift-500"
+            />
+            <Globe size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          </div>
+          <button
+            onClick={handleAnalyze}
+            disabled={!analyzeUrl.trim() || analyzing}
+            className="btn-primary flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
+          >
+            {analyzing ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <Search size={16} /> Analyze
+              </>
+            )}
+          </button>
+        </div>
+
+        {analyzeError && (
+          <div className="mt-3 flex items-center gap-2 p-3 rounded-lg bg-red-50 text-red-800 text-sm">
+            <AlertCircle size={16} />
+            {analyzeError}
+          </div>
+        )}
+
+        {analysis && <BreachReport analysis={analysis} />}
+      </div>
+
+      {/* ── Domain Cards ─────────────────────────────────── */}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {domains.map((domain) => (
@@ -264,6 +339,188 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════
+   BREACH ANALYSIS REPORT
+   ═══════════════════════════════════════════════════════ */
+
+const GRADE_COLORS: Record<string, string> = {
+  A: 'bg-green-500',
+  B: 'bg-green-400',
+  C: 'bg-yellow-400',
+  D: 'bg-orange-500',
+  F: 'bg-red-500',
+}
+
+const SEVERITY_BADGE: Record<string, string> = {
+  critical: 'bg-red-100 text-red-800 border-red-200',
+  high: 'bg-orange-100 text-orange-800 border-orange-200',
+  medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  low: 'bg-blue-100 text-blue-800 border-blue-200',
+}
+
+function BreachReport({ analysis }: { analysis: BreachAnalysis }) {
+  const [showAllFindings, setShowAllFindings] = useState(false)
+  const visibleFindings = showAllFindings ? analysis.findings : analysis.findings.slice(0, 5)
+
+  return (
+    <div className="mt-6 space-y-5">
+      {/* Score + Summary bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+        <div className="flex items-center gap-4">
+          <div className={clsx(
+            'w-16 h-16 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-sm',
+            GRADE_COLORS[analysis.grade] || 'bg-gray-400'
+          )}>
+            {analysis.grade}
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-gray-900">{analysis.security_score}<span className="text-sm font-normal text-gray-500">/100</span></div>
+            <p className="text-xs text-gray-500">Security Score</p>
+          </div>
+        </div>
+
+        <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3 sm:ml-6">
+          <MiniStat label="Critical" value={analysis.summary.critical} color="text-red-600" />
+          <MiniStat label="High" value={analysis.summary.high} color="text-orange-600" />
+          <MiniStat label="Medium" value={analysis.summary.medium} color="text-yellow-600" />
+          <MiniStat label="Low" value={analysis.summary.low} color="text-blue-600" />
+        </div>
+
+        <div className="text-right text-xs text-gray-400 sm:ml-4 shrink-0">
+          <a href={analysis.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-drift-600 hover:text-drift-800 mb-1">
+            {analysis.hostname} <ExternalLink size={12} />
+          </a>
+          <div>HTTP {analysis.status_code}</div>
+          <div>{new Date(analysis.analyzed_at).toLocaleString()}</div>
+        </div>
+      </div>
+
+      {/* SSL Certificate */}
+      {analysis.ssl && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-3">
+            {analysis.ssl.valid
+              ? <ShieldCheck size={18} className="text-green-600" />
+              : <ShieldAlert size={18} className="text-red-600" />
+            }
+            <h3 className="text-sm font-semibold text-gray-800">SSL / TLS Certificate</h3>
+          </div>
+          {analysis.ssl.valid ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <div>
+                <span className="text-gray-500 block">Protocol</span>
+                <span className="font-medium text-gray-800">{analysis.ssl.protocol}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 block">Issuer</span>
+                <span className="font-medium text-gray-800">{analysis.ssl.issuer}</span>
+              </div>
+              <div>
+                <span className="text-gray-500 block">Expires</span>
+                <span className="font-medium text-gray-800">
+                  {analysis.ssl.expires ? new Date(analysis.ssl.expires).toLocaleDateString() : '—'}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-500 block">Days Remaining</span>
+                <span className={clsx(
+                  'font-medium',
+                  (analysis.ssl.days_remaining ?? 0) > 30 ? 'text-green-700' : 'text-orange-600'
+                )}>
+                  {analysis.ssl.days_remaining}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-red-700">{analysis.ssl.error || 'Certificate is invalid'}</p>
+          )}
+        </div>
+      )}
+
+      {/* Security Headers */}
+      <div className="card">
+        <div className="flex items-center gap-2 mb-3">
+          <Shield size={18} className="text-drift-700" />
+          <h3 className="text-sm font-semibold text-gray-800">Security Headers</h3>
+          <span className="ml-auto text-xs text-gray-400">
+            {analysis.headers.filter(h => h.present).length}/{analysis.headers.length} present
+          </span>
+        </div>
+        <div className="divide-y divide-gray-100">
+          {analysis.headers.map((h) => (
+            <div key={h.header} className="py-2 flex items-center gap-3">
+              {h.present
+                ? <CheckCircle size={14} className="text-green-500 shrink-0" />
+                : <AlertCircle size={14} className="text-red-400 shrink-0" />
+              }
+              <span className="text-sm text-gray-800 flex-1">{h.header}</span>
+              {h.present && h.value && (
+                <span className="text-xs text-gray-500 truncate max-w-48 hidden md:block font-mono">{h.value}</span>
+              )}
+              <span className={clsx(
+                'text-[10px] px-1.5 py-0.5 rounded border font-medium shrink-0',
+                SEVERITY_BADGE[h.severity]
+              )}>
+                {h.severity}
+              </span>
+              <span className="text-[10px] font-mono text-gray-400 w-10 text-right shrink-0">{h.nist_control}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Findings */}
+      {analysis.findings.length > 0 && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldAlert size={18} className="text-red-600" />
+            <h3 className="text-sm font-semibold text-gray-800">Findings ({analysis.findings.length})</h3>
+          </div>
+          <div className="space-y-2">
+            {visibleFindings.map((f, i) => (
+              <div key={i} className="p-3 rounded-lg bg-gray-50 border border-gray-100">
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <h4 className="text-sm font-medium text-gray-900">{f.title}</h4>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={clsx(
+                      'text-[10px] px-1.5 py-0.5 rounded border font-medium',
+                      SEVERITY_BADGE[f.severity]
+                    )}>
+                      {f.severity}
+                    </span>
+                    <span className="text-[10px] font-mono text-gray-400">{f.nist_control}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-600 mb-1">{f.description}</p>
+                <p className="text-xs text-drift-700">
+                  <strong>Fix:</strong> {f.recommendation}
+                </p>
+              </div>
+            ))}
+          </div>
+          {analysis.findings.length > 5 && (
+            <button
+              onClick={() => setShowAllFindings(!showAllFindings)}
+              className="mt-3 text-xs text-drift-600 hover:text-drift-800"
+            >
+              {showAllFindings ? 'Show less' : `Show all ${analysis.findings.length} findings`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MiniStat({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div className="text-center">
+      <div className={clsx('text-lg font-bold', color)}>{value}</div>
+      <div className="text-[10px] text-gray-500">{label}</div>
     </div>
   )
 }

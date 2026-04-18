@@ -54,6 +54,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ yaml_content: yamlContent }),
     }),
+  analyzeUrl: (url: string) =>
+    request<import('./types').BreachAnalysis>('/domains/analyze-url', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    }),
 
   // Governance
   getPendingActions: () =>

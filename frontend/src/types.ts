@@ -108,3 +108,46 @@ export interface OnboardingStep {
   description: string
   completed: boolean
 }
+
+export interface BreachAnalysis {
+  url: string
+  hostname: string
+  status_code: number
+  analyzed_at: string
+  security_score: number
+  grade: string
+  ssl: {
+    valid: boolean
+    issuer?: string
+    subject?: string
+    not_before?: string
+    expires?: string
+    days_remaining?: number
+    protocol?: string
+    expired?: boolean
+    expiring_soon?: boolean
+    error?: string
+  } | null
+  headers: {
+    header: string
+    present: boolean
+    value: string | null
+    severity: string
+    nist_control: string
+  }[]
+  findings: {
+    category: string
+    severity: string
+    title: string
+    description: string
+    nist_control: string
+    recommendation: string
+  }[]
+  summary: {
+    total_findings: number
+    critical: number
+    high: number
+    medium: number
+    low: number
+  }
+}
