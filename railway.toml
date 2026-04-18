@@ -1,0 +1,14 @@
+[deploy]
+  [deploy.services]
+    [deploy.services.backend]
+      builder = "nixpacks"
+      rootDir = "backend"
+      startCommand = "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"
+      [deploy.services.backend.variables]
+        ENVIRONMENT = "production"
+        DATABASE_URL = "sqlite+aiosqlite:///./driftguard.db"
+
+    [deploy.services.frontend]
+      builder = "nixpacks"
+      rootDir = "frontend"
+      buildCommand = "npm install && npm run build"

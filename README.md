@@ -8,6 +8,13 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-green.svg)](https://python.org)
 [![Node 18+](https://img.shields.io/badge/node-18+-green.svg)](https://nodejs.org)
 
+### Deploy Instantly (free)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/user/DriftGuard)
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/DriftGuard?referralCode=open)
+
+Or use **Fly.io**: `fly launch --copy-config`
+
 ---
 
 ## One-Click Setup
