@@ -86,6 +86,13 @@ export const api = {
       body: JSON.stringify({ url }),
     }),
 
+  // Live Scanner
+  liveScan: (url: string, scanPorts = true, scanDns = true) =>
+    request<import('./types').LiveScanResult>('/scanner/scan', {
+      method: 'POST',
+      body: JSON.stringify({ url, scan_ports: scanPorts, scan_dns: scanDns }),
+    }),
+
   // Governance
   getPendingActions: () =>
     request<import('./types').GovernanceAction[]>('/governance/pending'),

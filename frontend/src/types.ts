@@ -216,3 +216,71 @@ export interface WebhookInfo {
   domain: string
   description: string
 }
+
+// ── Live Scanner ────────────────────────────────────
+export interface LiveScanResult {
+  url: string
+  hostname: string
+  ip_addresses: string[]
+  status_code: number
+  redirect_chain: string[]
+  scanned_at: string
+  duration_ms: number
+  security_score: number
+  grade: string
+  ssl: {
+    valid: boolean
+    protocol?: string
+    cipher?: string
+    cipher_bits?: number
+    issuer_org?: string
+    issuer_cn?: string
+    subject_cn?: string
+    san?: string[]
+    not_before?: string
+    expires?: string
+    days_remaining?: number
+    expired?: boolean
+    expiring_soon?: boolean
+    key_weak?: boolean
+    error?: string
+  } | null
+  headers: {
+    header: string
+    key: string
+    present: boolean
+    value: string | null
+    nist_control: string
+  }[]
+  cookies: {
+    name: string
+    flags: { secure: boolean; httponly: boolean; samesite: boolean }
+    issues: string[]
+    secure: boolean
+  }[]
+  dns: {
+    a_records: string[]
+    aaaa_records: string[]
+    mx_records: { priority: number; exchange: string }[]
+    spf: string | null
+    dmarc: string | null
+    findings: { severity: string; title: string; description: string; nist_control: string }[]
+  } | null
+  open_ports: { port: number; service: string; risk: string }[]
+  technologies: { name: string; source: string; detail: string }[]
+  findings: {
+    severity: string
+    title: string
+    description: string
+    nist_control: string
+    category: string
+  }[]
+  summary: {
+    total_findings: number
+    critical: number
+    high: number
+    medium: number
+    low: number
+    info: number
+  }
+}

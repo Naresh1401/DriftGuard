@@ -156,6 +156,7 @@ from api.routes.governance import router as governance_router
 from api.routes.reports import router as reports_router
 from api.routes.onboarding import router as onboarding_router
 from api.routes.integrations import router as integrations_router
+from api.routes.scanner import router as scanner_router
 
 app.include_router(health_router, prefix=settings.api_prefix)
 app.include_router(signals_router, prefix=settings.api_prefix)
@@ -166,6 +167,7 @@ app.include_router(governance_router, prefix=settings.api_prefix)
 app.include_router(reports_router, prefix=settings.api_prefix)
 app.include_router(onboarding_router, prefix=settings.api_prefix)
 app.include_router(integrations_router, prefix=settings.api_prefix)
+app.include_router(scanner_router, prefix=settings.api_prefix)
 
 
 @app.get("/")
