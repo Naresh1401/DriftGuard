@@ -41,7 +41,7 @@ _PII_PATTERNS = [
 ]
 
 _PII_FIELD_NAMES = frozenset({
-    "employee_id", "user_id", "username", "email", "name",
+    "employee_id", "user_id", "username", "user_name", "email", "name",
     "first_name", "last_name", "full_name", "ssn", "phone",
     "employee_name", "staff_id", "badge_id", "personal_id",
 })

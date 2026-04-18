@@ -9,6 +9,7 @@ import {
   Shield,
   BarChart3,
   ChevronDown,
+  DatabaseZap,
 } from 'lucide-react'
 import { useState } from 'react'
 import clsx from 'clsx'
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { to: '/drift-map', label: 'Drift Map', icon: Map },
   { to: '/calibration', label: 'NI Calibration', icon: BookOpen },
   { to: '/domains', label: 'Domains', icon: Globe },
+  { to: '/data-collection', label: 'Data Collection', icon: DatabaseZap },
   { to: '/governance', label: 'Governance', icon: Shield },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
 ]

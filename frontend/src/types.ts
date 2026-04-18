@@ -151,3 +151,68 @@ export interface BreachAnalysis {
     low: number
   }
 }
+
+export interface IngestResult {
+  status: string
+  signals_parsed: number
+  results: { signal_id: string; signal_type: string; anonymized: boolean; source?: string }[]
+  filename?: string
+  format_detected?: string
+}
+
+export interface EmailAnalysis {
+  security_score: number
+  grade: string
+  risk_score: number
+  metadata: {
+    from: string | null
+    to: string | null
+    subject: string | null
+    date: string | null
+    reply_to: string | null
+    message_id: string | null
+    x_mailer: string | null
+    received_hops: number
+  }
+  findings: {
+    severity: string
+    title: string
+    description: string
+    nist_control: string
+    category: string
+  }[]
+}
+
+export interface SIEMResult {
+  siem: string
+  query: string
+  time_range: string
+  mode: string
+  events_returned: number
+  events: {
+    timestamp: string
+    event_type: string
+    user: string
+    details: string
+    severity: string
+    source_ip?: string
+  }[]
+  message?: string
+}
+
+export interface WebhookRegistration {
+  webhook_id: string
+  endpoint: string
+  secret: string
+  signal_type: string
+  domain: string
+  name: string
+}
+
+export interface WebhookInfo {
+  webhook_id: string
+  name: string
+  signal_type: string
+  domain: string
+  description: string
+}

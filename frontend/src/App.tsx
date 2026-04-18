@@ -9,6 +9,7 @@ import Domains from './pages/Domains'
 import Governance from './pages/Governance'
 import Reports from './pages/Reports'
 import Onboarding from './pages/Onboarding'
+import DataCollection from './pages/DataCollection'
 
 export default function App() {
   return (
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/drift-map" element={<DriftMap />} />
           <Route path="/calibration" element={<Calibration />} />
           <Route path="/domains" element={<Domains />} />
+          <Route path="/data-collection" element={<DataCollection />} />
           <Route path="/governance" element={<Governance />} />
           <Route path="/reports" element={<Reports />} />
         </Route>

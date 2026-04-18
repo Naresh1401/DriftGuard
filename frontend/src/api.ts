@@ -35,6 +35,32 @@ export const api = {
   // Signals
   ingestSignal: (signal: Record<string, unknown>) =>
     request('/signals/ingest', { method: 'POST', body: JSON.stringify(signal) }),
+  uploadCsv: (csvContent: string, domain?: string) =>
+    request<import('./types').IngestResult>('/signals/upload/csv', {
+      method: 'POST', body: JSON.stringify({ csv_content: csvContent, domain: domain || 'enterprise' }),
+    }),
+  uploadJson: (jsonContent: string, domain?: string) =>
+    request<import('./types').IngestResult>('/signals/upload/json', {
+      method: 'POST', body: JSON.stringify({ json_content: jsonContent, domain: domain || 'enterprise' }),
+    }),
+  uploadLogs: (logContent: string, logFormat?: string, domain?: string) =>
+    request<import('./types').IngestResult>('/signals/upload/logs', {
+      method: 'POST', body: JSON.stringify({ log_content: logContent, log_format: logFormat || 'auto', domain: domain || 'enterprise' }),
+    }),
+  analyzeEmailHeaders: (headers: string) =>
+    request<import('./types').EmailAnalysis>('/signals/analyze/email-headers', {
+      method: 'POST', body: JSON.stringify({ headers }),
+    }),
+  querySiem: (siemType: string, query: string, timeRange?: string) =>
+    request<import('./types').SIEMResult>('/signals/collect/siem', {
+      method: 'POST', body: JSON.stringify({ siem_type: siemType, query, time_range: timeRange || '24h' }),
+    }),
+  registerWebhook: (name: string, signalType?: string, domain?: string) =>
+    request<import('./types').WebhookRegistration>('/signals/webhooks/register', {
+      method: 'POST', body: JSON.stringify({ name, signal_type: signalType || 'custom', domain: domain || 'enterprise' }),
+    }),
+  listWebhooks: () =>
+    request<{ webhooks: import('./types').WebhookInfo[] }>('/signals/webhooks').then(r => r.webhooks),
 
   // Calibration
   getCalibrationResponses: () =>

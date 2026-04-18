@@ -58,6 +58,7 @@ export const NAV_ACCESS: Record<string, UserRole[]> = {
   '/drift-map':    ['admin', 'ciso', 'ni_architect', 'compliance_officer', 'viewer'],
   '/calibration':  ['admin', 'ciso', 'ni_architect', 'compliance_officer'],
   '/domains':      ['admin', 'ciso'],
+  '/data-collection': ['admin', 'ciso', 'ni_architect', 'compliance_officer'],
   '/governance':   ['admin', 'ciso', 'ni_architect', 'compliance_officer'],
   '/reports':      ['admin', 'ciso', 'ni_architect', 'compliance_officer'],
 }
