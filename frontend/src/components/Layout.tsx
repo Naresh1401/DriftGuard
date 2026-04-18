@@ -35,6 +35,22 @@ const ROLE_LABELS: Record<UserRole, string> = {
   viewer: 'Viewer',
 }
 
+const ROLE_DESCRIPTIONS: Record<UserRole, string> = {
+  admin: 'Full system access',
+  ciso: 'Risk analysis & NIST',
+  ni_architect: 'Calibration & approval',
+  compliance_officer: 'Alerts & compliance',
+  viewer: 'Read-only access',
+}
+
+const ROLE_COLORS: Record<UserRole, string> = {
+  admin: 'bg-purple-100 text-purple-700 border-purple-200',
+  ciso: 'bg-red-100 text-red-700 border-red-200',
+  ni_architect: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  compliance_officer: 'bg-blue-100 text-blue-700 border-blue-200',
+  viewer: 'bg-gray-100 text-gray-600 border-gray-200',
+}
+
 export default function Layout() {
   const { role, setRole } = useAuth()
   const [roleOpen, setRoleOpen] = useState(false)
@@ -92,17 +108,23 @@ export default function Layout() {
             ))}
           </nav>
 
-          {/* Role switcher (for demo/dev) */}
+          {/* Role switcher */}
           <div className="p-4 border-t border-gray-100 relative">
+            <div className="mb-2">
+              <span className={clsx('inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border', ROLE_COLORS[role])}>
+                {ROLE_LABELS[role]}
+              </span>
+              <p className="text-xs text-gray-400 mt-1">{ROLE_DESCRIPTIONS[role]}</p>
+            </div>
             <button
               onClick={() => setRoleOpen(!roleOpen)}
               className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 text-sm text-gray-700 hover:bg-gray-100"
             >
-              <span className="font-medium">{ROLE_LABELS[role]}</span>
+              <span className="text-xs text-gray-500">Switch role</span>
               <ChevronDown size={16} />
             </button>
             {roleOpen && (
-              <div className="absolute bottom-full left-4 right-4 mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+              <div className="absolute bottom-full left-4 right-4 mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
                 {(Object.keys(ROLE_LABELS) as UserRole[]).map((r) => (
                   <button
                     key={r}
@@ -111,11 +133,14 @@ export default function Layout() {
                       setRoleOpen(false)
                     }}
                     className={clsx(
-                      'w-full text-left px-3 py-2 text-sm hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg',
-                      r === role ? 'text-drift-700 font-medium' : 'text-gray-600'
+                      'w-full text-left px-3 py-2 hover:bg-gray-50',
+                      r === role ? 'bg-gray-50' : ''
                     )}
                   >
-                    {ROLE_LABELS[r]}
+                    <span className={clsx('inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border', ROLE_COLORS[r])}>
+                      {ROLE_LABELS[r]}
+                    </span>
+                    <span className="block text-xs text-gray-400 mt-0.5 ml-0.5">{ROLE_DESCRIPTIONS[r]}</span>
                   </button>
                 ))}
               </div>

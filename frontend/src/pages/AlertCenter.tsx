@@ -87,7 +87,17 @@ export default function AlertCenter() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Alert Center</h1>
-          <p className="text-sm text-gray-500 mt-1">Real-time drift alerts with action controls</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {role === 'ciso'
+              ? 'Technical alert analysis with NIST controls and recommended actions'
+              : role === 'admin'
+                ? 'Full alert management — acknowledge, resolve, and monitor all drift signals'
+                : role === 'compliance_officer'
+                  ? 'Drift alerts requiring compliance review and remediation'
+                  : role === 'ni_architect'
+                    ? 'Pattern alerts informing calibration priorities'
+                    : 'Real-time organizational drift alerts (read-only)'}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Filter size={16} className="text-gray-400" />
@@ -142,6 +152,16 @@ export default function AlertCenter() {
                     <div className="mt-2 text-xs text-gray-500 space-y-1">
                       <p><strong>NIST Controls:</strong> {alert.nist_controls.join(', ')}</p>
                       <p><strong>Recommended:</strong> {alert.recommended_action}</p>
+                    </div>
+                  )}
+                  {role === 'compliance_officer' && (
+                    <div className="mt-2 text-xs text-blue-600 bg-blue-50 rounded p-2">
+                      <p><strong>Recommended Action:</strong> {alert.recommended_action}</p>
+                    </div>
+                  )}
+                  {role === 'ni_architect' && (
+                    <div className="mt-2 text-xs text-indigo-600 bg-indigo-50 rounded p-2">
+                      <p><strong>Calibration relevance:</strong> Pattern "{alert.drift_pattern.replace(/_/g, ' ')}" at severity {alert.severity}/5 — check NI response coverage</p>
                     </div>
                   )}
                 </div>

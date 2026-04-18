@@ -75,10 +75,14 @@ export default function Reports() {
         <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
         <p className="text-sm text-gray-500 mt-1">
           {role === 'compliance_officer'
-            ? 'Plain language compliance reports'
+            ? 'Plain language compliance reports — no technical jargon'
             : role === 'ciso'
-              ? 'Technical risk analysis and NIST alignment'
-              : 'Organizational drift reports and metrics'}
+              ? 'Technical risk analysis, NIST alignment, and board-ready executive summaries'
+              : role === 'ni_architect'
+                ? 'Calibration effectiveness and pattern coverage metrics'
+                : role === 'admin'
+                  ? 'Complete organizational reports across all categories'
+                  : 'Weekly organizational health summary'}
         </p>
       </div>
 
@@ -107,37 +111,105 @@ export default function Reports() {
 
 function WeeklyReport() {
   const s = WEEKLY_SUMMARY
+  const { role } = useAuth()
   return (
     <div className="space-y-6">
       <div className="card">
         <h3 className="text-sm font-semibold text-gray-700 mb-4">
           Week of {s.period}
         </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Stat label="Health Score" value={`${s.health_score}/100`} />
-          <Stat label="Total Alerts" value={s.total_alerts} />
-          <Stat label="Critical" value={s.critical} color="text-red-600" />
-          <Stat label="Calibrations Delivered" value={s.calibrations_delivered} />
-        </div>
+        {role === 'compliance_officer' ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Stat label="Compliance Health" value={`${s.health_score}/100`} />
+            <Stat label="Issues Requiring Review" value={s.critical + s.warning} color="text-orange-600" />
+            <Stat label="Resolved This Week" value={s.calibrations_delivered} />
+            <Stat label="Effectiveness Rate" value={`${s.effectiveness_rate}%`} />
+          </div>
+        ) : role === 'ni_architect' ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Stat label="Calibrations Delivered" value={s.calibrations_delivered} />
+            <Stat label="Effectiveness Rate" value={`${s.effectiveness_rate}%`} />
+            <Stat label="Active Patterns" value={PATTERN_PIE.length} />
+            <Stat label="Alerts Triggered" value={s.total_alerts} />
+          </div>
+        ) : role === 'viewer' ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <Stat label="Health Score" value={`${s.health_score}/100`} />
+            <Stat label="Total Alerts" value={s.total_alerts} />
+            <Stat label="Critical" value={s.critical} color="text-red-600" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Stat label="Health Score" value={`${s.health_score}/100`} />
+            <Stat label="Total Alerts" value={s.total_alerts} />
+            <Stat label="Critical" value={s.critical} color="text-red-600" />
+            <Stat label="Calibrations Delivered" value={s.calibrations_delivered} />
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Department risk */}
-        <div className="card">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Department Risk Scores</h3>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={DEPT_RISK}>
-              <XAxis dataKey="department" tick={{ fontSize: 11 }} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-              <Tooltip />
-              <Bar dataKey="risk_score" fill="#4263eb" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+      {/* Compliance officer: plain-language narrative */}
+      {role === 'compliance_officer' && (
+        <div className="card border-l-4 border-blue-500">
+          <h3 className="text-sm font-semibold text-blue-800 mb-2">Plain Language Summary</h3>
+          <p className="text-sm text-gray-700">
+            This week, the organization scored <strong>{s.health_score} out of 100</strong> on overall security health.
+            There were <strong>{s.critical} critical</strong> and <strong>{s.warning} moderate</strong> issues detected.
+            {s.calibrations_delivered} corrective actions were delivered with a <strong>{s.effectiveness_rate}%</strong> success rate.
+            The most common issue was staff fatigue in the SOC team. No regulatory violations were detected.
+          </p>
         </div>
+      )}
+
+      {/* NI Architect: calibration effectiveness breakdown */}
+      {role === 'ni_architect' && (
+        <div className="card border-l-4 border-indigo-500">
+          <h3 className="text-sm font-semibold text-indigo-800 mb-3">Calibration Effectiveness Breakdown</h3>
+          <div className="space-y-2">
+            {[
+              { pattern: 'Fatigue', delivered: 3, effective: 2 },
+              { pattern: 'Overconfidence', delivered: 2, effective: 2 },
+              { pattern: 'Compliance Theater', delivered: 2, effective: 1 },
+              { pattern: 'Hurry', delivered: 1, effective: 1 },
+            ].map(({ pattern, delivered, effective }) => (
+              <div key={pattern} className="flex items-center gap-3">
+                <span className="text-sm text-gray-700 w-40">{pattern}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-2">
+                  <div
+                    className="h-2 rounded-full bg-indigo-500"
+                    style={{ width: `${(effective / delivered) * 100}%` }}
+                  />
+                </div>
+                <span className="text-xs text-gray-500 w-16 text-right">{effective}/{delivered}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Department risk — not shown to viewer */}
+        {role !== 'viewer' && (
+          <div className="card">
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">
+              {role === 'compliance_officer' ? 'Compliance Risk by Department' : 'Department Risk Scores'}
+            </h3>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={DEPT_RISK}>
+                <XAxis dataKey="department" tick={{ fontSize: 11 }} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="risk_score" fill={role === 'compliance_officer' ? '#2563eb' : '#4263eb'} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
 
         {/* Pattern distribution pie */}
         <div className="card">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Alert Distribution by Pattern</h3>
+          <h3 className="text-sm font-semibold text-gray-700 mb-4">
+            {role === 'ni_architect' ? 'Calibration Targets by Pattern' : 'Alert Distribution by Pattern'}
+          </h3>
           <ResponsiveContainer width="100%" height={250}>
             <PieChart>
               <Pie
@@ -210,7 +282,9 @@ function BoardSummary({ role }: { role: string }) {
       <div className="card">
         <div className="flex items-center gap-3 mb-4">
           <Users size={20} className="text-drift-700" />
-          <h3 className="text-sm font-semibold text-gray-700">Board-Level Executive Summary</h3>
+          <h3 className="text-sm font-semibold text-gray-700">
+            {role === 'ciso' ? 'CISO Executive Briefing' : 'Board-Level Executive Summary'}
+          </h3>
         </div>
 
         <div className="prose prose-sm max-w-none text-gray-700">
@@ -246,13 +320,58 @@ function BoardSummary({ role }: { role: string }) {
             thresholds.
           </p>
 
-          {role !== 'compliance_officer' && (
+          {/* CISO-specific: risk trend & strategic recommendations */}
+          {role === 'ciso' && (
+            <>
+              <h4>Risk Trend (30-Day)</h4>
+              <p>
+                Overall risk posture has <strong>increased 8%</strong> since the previous reporting period,
+                driven primarily by the SOC fatigue pattern (contributing 4.2 points) and the compliance
+                divergence finding (contributing 3.1 points). Engineering bypass patterns are stabilizing.
+              </p>
+              <h4>Strategic Recommendations</h4>
+              <ol>
+                <li>Escalate SOC staffing review to VP-level — fatigue pattern shows acceleration trajectory</li>
+                <li>Commission third-party compliance program audit to validate DriftGuard findings</li>
+                <li>Present the compliance divergence finding to the audit committee with quantified risk exposure</li>
+                <li>Establish quarterly board cadence for Neuro-Informed risk reporting</li>
+              </ol>
+            </>
+          )}
+
+          {/* Admin-specific: full board actions + system recommendations */}
+          {role === 'admin' && (
             <>
               <h4>Recommended Board Actions</h4>
               <ol>
                 <li>Authorize SOC staffing review to address capacity constraints</li>
                 <li>Commission compliance program effectiveness assessment</li>
                 <li>Review engineering deployment governance framework</li>
+              </ol>
+              <h4>System Administration Notes</h4>
+              <p>
+                Current domain configuration: Healthcare (primary). 5 integrations active.
+                Alert processing latency: 1.2s average. Storage utilization: 34%.
+                Next scheduled maintenance: January 15, 2025.
+              </p>
+            </>
+          )}
+
+          {/* Compliance officer gets simplified, non-technical actions */}
+          {role === 'compliance_officer' && (
+            <>
+              <h4>What This Means for Compliance</h4>
+              <p>
+                The audit completion rates look good on paper (98%), but DriftGuard has detected that these
+                audits are not translating into actual security improvements. This is called &quot;Compliance Theater&quot; —
+                where teams follow the process without achieving the intended outcome. <strong>This is the most
+                important finding for your team this week.</strong>
+              </p>
+              <h4>Recommended Next Steps</h4>
+              <ol>
+                <li>Review audit procedures for effectiveness, not just completion</li>
+                <li>Schedule a meeting with the SOC team to understand workload pressures</li>
+                <li>Document the compliance divergence finding for the next regulatory review</li>
               </ol>
             </>
           )}
