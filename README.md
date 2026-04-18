@@ -10,10 +10,10 @@
 
 ### Deploy Instantly (free)
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/user/DriftGuard)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Naresh1401/DriftGuard)
 [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/template/DriftGuard?referralCode=open)
 
-Or use **Fly.io**: `fly launch --copy-config`
+**Live Demo:** [https://driftguard.vercel.app](https://driftguard.vercel.app)
 
 ---
 
