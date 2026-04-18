@@ -47,6 +47,13 @@ export const api = {
   // Domains
   getDomains: () =>
     request<{ domains: import('./types').DomainConfig[] }>('/domains').then(r => r.domains),
+  getDomain: (name: string) =>
+    request<import('./types').DomainConfig>(`/domains/${encodeURIComponent(name)}`),
+  uploadDomainYaml: (yamlContent: string) =>
+    request<{ status: string; domain: string }>('/domains/upload/yaml', {
+      method: 'POST',
+      body: JSON.stringify({ yaml_content: yamlContent }),
+    }),
 
   // Governance
   getPendingActions: () =>
