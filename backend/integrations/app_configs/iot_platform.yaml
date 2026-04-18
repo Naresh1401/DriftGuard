@@ -1,0 +1,44 @@
+app:
+  name: "iot_platform"
+  type: "iot_platform"
+  domain: "enterprise"
+  description: "IoT/ICS/SCADA platform — industrial control, smart devices, embedded systems"
+
+signals:
+  - type: "access_log"
+    sources: ["device-gateway", "mqtt-broker", "ota-server"]
+    maps_to: ["Hoarding", "Overconfidence"]
+    nist_controls: ["AC-2", "CA-7"]
+    description: "Device authentication, firmware access, API key usage"
+
+  - type: "audit_review"
+    sources: ["device-management", "firmware-registry"]
+    maps_to: ["Fatigue", "Compliance_Theater"]
+    nist_controls: ["AU-6", "CA-7"]
+    description: "Firmware updates, device config reviews, compliance scans"
+
+  - type: "incident_response"
+    sources: ["anomaly-detection", "intrusion-detection", "network-monitor"]
+    maps_to: ["Hurry", "Quiet_Fear"]
+    nist_controls: ["IR-6", "CA-7"]
+    description: "Anomalous device behavior, network intrusions, OTA failures"
+
+  - type: "approval_workflow"
+    sources: ["firmware-deploy", "network-changes"]
+    maps_to: ["Hurry", "Overconfidence"]
+    nist_controls: ["AU-6"]
+    description: "Firmware rollouts, network configuration changes"
+
+thresholds:
+  confidence: 0.75
+  alert_rules:
+    critical_patterns: 2
+    warning_patterns: 1
+    acceleration_threshold: 1.2
+  temporal:
+    lookback_days: 30
+    half_life_days: 7.0
+    acceleration_window_days: 14
+
+delivery:
+  methods: ["dashboard", "email"]

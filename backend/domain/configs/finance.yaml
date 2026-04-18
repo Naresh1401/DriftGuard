@@ -1,0 +1,65 @@
+# DriftGuard Domain Configuration — Finance
+# Highest drift risk: Overconfidence and Hoarding due to authority concentration.
+
+domain: finance
+display_name: Finance
+description: >
+  Financial institutions including banks, trading firms, insurance companies,
+  and investment management. Covers transaction approvals, trading logs,
+  audit trails, and exception request patterns.
+
+signals:
+  - type: transaction_approval_patterns
+    maps_to: [Overconfidence, Hurry]
+    nist_controls: [AC-2, AU-6]
+    description: Transaction approval workflows — speed, exception frequency, override rate
+    source_connector: splunk
+
+  - type: trading_logs
+    maps_to: [Overconfidence, Hoarding]
+    nist_controls: [AC-2, CA-7]
+    description: Trading activity logs — access patterns, unusual hours, volume spikes
+    source_connector: splunk
+
+  - type: audit_trail_completeness
+    maps_to: [Compliance_Theater, Fatigue]
+    nist_controls: [AU-6, CA-7]
+    description: Audit trail gaps, review completion quality, findings ratio
+    source_connector: custom
+
+  - type: exception_request_frequency
+    maps_to: [Overconfidence, Hurry]
+    nist_controls: [AC-2, AT-2]
+    description: Exception and bypass request patterns — frequency, approvers, justifications
+    source_connector: custom
+
+  - type: access_review_patterns
+    maps_to: [Hoarding, Fatigue]
+    nist_controls: [AC-2, CA-7]
+    description: Periodic access review completion, permission retention, review engagement
+    source_connector: sentinel
+
+  - type: incident_response_times
+    maps_to: [Quiet_Fear, Hurry]
+    nist_controls: [IR-6]
+    description: Incident detection to response time, escalation patterns
+    source_connector: custom
+
+priority_controls: [AC-2, AU-6, CA-7]
+alert_sensitivity: aggressive
+response_delivery: [dashboard, email, slack]
+
+compliance:
+  sox_compliant: true
+  pci_dss: true
+  audit_trail_required: true
+
+highest_drift_risks:
+  - Overconfidence
+  - Hoarding
+
+risk_notes: >
+  Authority concentration in financial institutions creates elevated
+  Overconfidence and Hoarding risk. Senior traders and fund managers
+  often accumulate bypass privileges that go unreviewed. Compliance
+  Theater is a secondary risk due to regulatory volume.

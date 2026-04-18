@@ -1,0 +1,65 @@
+# DriftGuard Domain Configuration — Education
+# Highest drift risk: Compliance Theater and Fatigue due to bureaucratic volume.
+
+domain: education
+display_name: Education
+description: >
+  Educational institutions including universities, K-12 schools, and
+  research organizations. Covers student data access, administrative
+  workflows, research data handling, and IRB compliance.
+
+signals:
+  - type: student_data_access_logs
+    maps_to: [Hoarding, Overconfidence]
+    nist_controls: [AC-2, CA-7]
+    description: FERPA-covered student record access patterns
+    source_connector: google_workspace
+
+  - type: administrative_approval_workflows
+    maps_to: [Fatigue, Hurry]
+    nist_controls: [AU-6, AC-2]
+    description: Administrative approval chains — budget, hiring, policy changes
+    source_connector: custom
+
+  - type: research_data_handling
+    maps_to: [Hoarding, Compliance_Theater]
+    nist_controls: [CA-7, AU-6]
+    description: Research data access, sharing patterns, retention compliance
+    source_connector: custom
+
+  - type: irb_compliance_patterns
+    maps_to: [Compliance_Theater, Quiet_Fear]
+    nist_controls: [AT-2, CA-7]
+    description: IRB submission quality, protocol adherence, violation reporting
+    source_connector: custom
+
+  - type: incident_reporting
+    maps_to: [Quiet_Fear, Fatigue]
+    nist_controls: [IR-6, AU-6]
+    description: Campus security incident reports and escalation patterns
+    source_connector: custom
+
+  - type: training_completion
+    maps_to: [Compliance_Theater, Fatigue]
+    nist_controls: [AT-2, AU-6]
+    description: FERPA, Title IX, and cybersecurity training completion
+    source_connector: custom
+
+priority_controls: [AU-6, CA-7, AT-2]
+alert_sensitivity: conservative
+response_delivery: [dashboard, email]
+
+compliance:
+  ferpa_compliant: true
+  audit_trail_required: true
+
+highest_drift_risks:
+  - Compliance_Theater
+  - Fatigue
+
+risk_notes: >
+  Bureaucratic volume in educational institutions drives Compliance
+  Theater — high training completion rates with minimal behavioral
+  change. Faculty and administrative Fatigue from review overload
+  compounds the risk. Research environments face Hoarding risk from
+  data protectiveness.

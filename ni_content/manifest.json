@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "schema": "ni_content_manifest",
+  "description": "NI (Narrative Intelligence) Content Library Manifest — Placeholder Edition. All content in this library represents framework-team-approved placeholder responses. In production, these are replaced with domain-expert-authored content through the NI Content API and governance approval gates.",
+  "content_philosophy": "Every NI response must: (1) Never name, profile, or target individuals, (2) Explain the pattern, not the person, (3) Provide actionable organizational guidance, (4) Respect the humanity of the people involved. These are non-negotiable ethical constraints hardcoded into the delivery pipeline.",
+  "content_files": [
+    {
+      "file": "baseline_responses.json",
+      "description": "18 placeholder NI calibration responses covering all 6 drift patterns across multiple domains, severity ranges, and organizational contexts",
+      "entry_count": 18,
+      "coverage": {
+        "drift_patterns": ["Fatigue", "Overconfidence", "Hurry", "Quiet_Fear", "Hoarding", "Compliance_Theater"],
+        "domains": ["healthcare", "finance", "government", "retail", "education", "enterprise"],
+        "severity_ranges": ["1-3", "1-5", "3-5"]
+      }
+    },
+    {
+      "file": "escalation_templates.json",
+      "description": "Templates for alert-level-specific escalation communications (Watch, Warning, Critical)",
+      "entry_count": 6
+    },
+    {
+      "file": "board_summary_templates.json",
+      "description": "Templates for board-level summary reports with plain language drift explanations",
+      "entry_count": 3
+    }
+  ],
+  "governance": {
+    "approval_required": true,
+    "approval_gate": "NI_ResponseApprovalGate",
+    "all_placeholders_pre_approved": true,
+    "production_content_requires_framework_team_approval": true
+  }
+}

@@ -1,0 +1,57 @@
+app:
+  name: "web_application"
+  type: "web_application"
+  domain: "enterprise"
+  description: "Universal web application configuration — works for any web app (Django, Flask, Express, Rails, Spring, etc.)"
+
+signals:
+  - type: "access_log"
+    sources: ["auth-service", "api-gateway", "load-balancer"]
+    maps_to: ["Fatigue", "Hoarding", "Overconfidence"]
+    nist_controls: ["AC-2", "CA-7"]
+    description: "User authentication, session management, API access patterns"
+
+  - type: "audit_review"
+    sources: ["admin-panel", "compliance-module"]
+    maps_to: ["Fatigue", "Compliance_Theater"]
+    nist_controls: ["AU-6", "AT-2"]
+    description: "Admin actions, configuration changes, compliance checks"
+
+  - type: "incident_response"
+    sources: ["error-handler", "monitoring", "alerting"]
+    maps_to: ["Hurry", "Quiet_Fear"]
+    nist_controls: ["IR-6", "CA-7"]
+    description: "Application errors, downtime, security incidents"
+
+  - type: "approval_workflow"
+    sources: ["deployment-pipeline", "change-management"]
+    maps_to: ["Hurry", "Overconfidence"]
+    nist_controls: ["AU-6"]
+    description: "Code deployments, config changes, access requests"
+
+  - type: "communication"
+    sources: ["support-tickets", "internal-chat"]
+    maps_to: ["Quiet_Fear"]
+    nist_controls: ["IR-6"]
+    description: "Support escalations, internal communications about security"
+
+thresholds:
+  confidence: 0.70
+  severity_weights:
+    signal_intensity: 0.30
+    temporal_weight: 0.35
+    acceleration_ratio: 0.20
+    confidence: 0.15
+  alert_rules:
+    critical_patterns: 3
+    warning_patterns: 2
+    review_duration_threshold: 30
+    silence_duration_threshold: 48
+    acceleration_threshold: 1.5
+  temporal:
+    lookback_days: 14
+    half_life_days: 3.0
+    acceleration_window_days: 7
+
+delivery:
+  methods: ["dashboard", "email"]

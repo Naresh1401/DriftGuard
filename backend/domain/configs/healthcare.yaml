@@ -1,0 +1,71 @@
+# DriftGuard Domain Configuration — Healthcare
+# Primary vertical. HIPAA-compliant data handling required.
+# Highest drift risk: Fatigue and Hurry due to clinical workload pressure.
+
+domain: healthcare
+display_name: Healthcare
+description: >
+  Healthcare organizations including hospitals, clinics, and health systems.
+  Covers Epic EMR access, EHR patterns, prescription workflows, clinical
+  incident reporting. HIPAA-compliant data handling is mandatory.
+
+signals:
+  - type: emr_access_logs
+    maps_to: [Fatigue, Overconfidence]
+    nist_controls: [AU-6, AC-2]
+    description: Epic EMR access patterns — who accessed which patient records, when, frequency
+    source_connector: epic_emr
+
+  - type: ehr_access_patterns
+    maps_to: [Hoarding, Overconfidence]
+    nist_controls: [AC-2, CA-7]
+    description: Electronic Health Record access breadth and retention patterns
+    source_connector: epic_emr
+
+  - type: prescription_approval_chains
+    maps_to: [Hurry, Fatigue]
+    nist_controls: [AU-6, IR-6]
+    description: Prescription approval workflows — time to approve, override frequency
+    source_connector: epic_emr
+
+  - type: clinical_incident_reporting
+    maps_to: [Quiet_Fear, Compliance_Theater]
+    nist_controls: [IR-6, CA-7]
+    description: Clinical incident reports — frequency, narrative depth, escalation patterns
+    source_connector: custom
+
+  - type: audit_review_patterns
+    maps_to: [Fatigue, Compliance_Theater]
+    nist_controls: [AU-6, CA-7]
+    description: HIPAA audit review completion, variance in outcomes, reviewer engagement
+    source_connector: custom
+
+  - type: incident_response_times
+    maps_to: [Hurry, Quiet_Fear]
+    nist_controls: [IR-6]
+    description: Time from detection to action, escalation frequency, silence duration
+    source_connector: custom
+
+  - type: training_completion
+    maps_to: [Compliance_Theater, Fatigue]
+    nist_controls: [AT-2, AU-6]
+    description: HIPAA training completion rates, repeat failures, behavioral change
+    source_connector: custom
+
+priority_controls: [AU-6, IR-6, CA-7]
+alert_sensitivity: balanced
+response_delivery: [dashboard, email]
+
+compliance:
+  hipaa_compliant: true
+  audit_trail_required: true
+  phi_anonymization: true
+
+highest_drift_risks:
+  - Fatigue
+  - Hurry
+
+risk_notes: >
+  Clinical workload pressure creates the highest Fatigue and Hurry risk
+  in any industry. Alert overload from EMR systems compounds the problem.
+  Quiet Fear is elevated due to reporting culture in clinical environments.

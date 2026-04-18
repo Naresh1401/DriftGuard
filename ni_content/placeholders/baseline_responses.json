@@ -1,0 +1,182 @@
+[
+  {
+    "drift_pattern": "Fatigue",
+    "severity_range": [1, 5],
+    "organizational_context": "healthcare",
+    "role_context": "SOC analyst",
+    "moment_context": "sustained high-volume alert period",
+    "response_text": "The review cadence has exceeded sustainable rhythm. The pattern shows consistent engagement declining over time — not because of negligence, but because the volume has outpaced the capacity to process meaningfully. Reduce volume, increase depth, rotate reviewer assignments. The goal is not more reviews — it is reviews that actually see what they are looking at.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Fatigue",
+    "severity_range": [1, 3],
+    "organizational_context": "finance",
+    "role_context": "compliance officer",
+    "moment_context": "quarterly audit cycle",
+    "response_text": "Quarterly audit volume has compressed meaningful review into mechanical completion. The pattern is not failure — it is adaptation to unsustainable throughput. Stagger review timelines, redistribute audit load across the cycle rather than concentrating at quarter-end. Depth of review matters more than speed of completion.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Fatigue",
+    "severity_range": [3, 5],
+    "organizational_context": "enterprise",
+    "role_context": "security team",
+    "moment_context": "post-incident surge",
+    "response_text": "The team is operating in sustained alert-response mode following a recent incident. Cognitive fatigue is not weakness — it is the predictable result of sustained vigilance without recovery. Implement a rotation schedule that allows genuine cognitive rest. The next threat will be missed not because of incompetence but because exhaustion makes everything look the same.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Overconfidence",
+    "severity_range": [1, 5],
+    "organizational_context": "finance",
+    "role_context": "trading desk",
+    "moment_context": "exception request trend",
+    "response_text": "The pattern of exceptions has normalized risk in this team's decision-making. Each individual bypass seemed reasonable in isolation, but the cumulative effect is a governance framework that exists in policy but not in practice. A governance reset is required before access decisions return to standard flow. This is not about restricting capability — it is about restoring the boundaries that keep capability safe.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Overconfidence",
+    "severity_range": [1, 3],
+    "organizational_context": "enterprise",
+    "role_context": "engineering lead",
+    "moment_context": "deployment cycle",
+    "response_text": "Deployment approvals are being compressed or bypassed based on familiarity with the system. Expertise is an asset, but when it replaces process, it becomes a single point of failure. The protocol exists not because the team is unreliable, but because even reliable judgment benefits from structured verification.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Overconfidence",
+    "severity_range": [3, 5],
+    "organizational_context": "healthcare",
+    "role_context": "system administrator",
+    "moment_context": "access privilege escalation",
+    "response_text": "Access privileges have expanded beyond role requirements through accumulated exceptions. In clinical environments, this creates patient data exposure that compounds with each additional access point. The correction is not punitive — it is a return to the principle of least privilege that protects both the organization and the individuals within it.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Hurry",
+    "severity_range": [1, 5],
+    "organizational_context": "enterprise",
+    "role_context": "development team",
+    "moment_context": "release deadline",
+    "response_text": "Deadline pressure has compressed validation into a formality rather than a safeguard. The shortcuts being taken now will persist as permanent configurations long after the deadline passes. Extend the validation window or reduce scope — a delayed release with proper validation is less costly than a rushed release with embedded vulnerabilities.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Hurry",
+    "severity_range": [3, 5],
+    "organizational_context": "healthcare",
+    "role_context": "clinical IT",
+    "moment_context": "system migration",
+    "response_text": "System migration timelines have overridden the validation steps designed to protect clinical data integrity. In healthcare, rushed configurations do not just create technical debt — they create patient safety risk. The migration timeline must accommodate validation, not the other way around. Pause, validate what has been deployed, then proceed with the remaining migration in a cadence that allows genuine review.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Quiet_Fear",
+    "severity_range": [1, 5],
+    "organizational_context": "government",
+    "role_context": "security analyst",
+    "moment_context": "under-reporting pattern",
+    "response_text": "The silence in this team's incident reporting is itself the signal. When qualified professionals stop surfacing concerns, the problem is not that there are no concerns — it is that the environment has made raising them feel unsafe. Before investigating the technical gap, address the reporting culture. Create a mechanism for anonymous concern escalation. The vulnerability that is not reported is more dangerous than the one that is.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Quiet_Fear",
+    "severity_range": [3, 5],
+    "organizational_context": "enterprise",
+    "role_context": "incident response team",
+    "moment_context": "escalation avoidance",
+    "response_text": "Known issues are aging without escalation despite their severity. This pattern indicates that the cost of reporting — whether reputational, political, or professional — is perceived as higher than the cost of silence. That calculation is always wrong in cybersecurity, but it feels rational to the people making it. Leadership must explicitly reduce the cost of speaking up before the hidden vulnerabilities surface as breaches.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Hoarding",
+    "severity_range": [1, 5],
+    "organizational_context": "enterprise",
+    "role_context": "department lead",
+    "moment_context": "access retention review",
+    "response_text": "Access and authority have accumulated beyond what the role requires. This is often not malicious — it is the natural result of expanding responsibilities without corresponding access reviews. But the security impact is the same regardless of intent: concentrated access creates concentrated risk. A structured access right-sizing conversation — not an audit threat — is the appropriate next step.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Hoarding",
+    "severity_range": [3, 5],
+    "organizational_context": "finance",
+    "role_context": "senior manager",
+    "moment_context": "audit resistance signals",
+    "response_text": "Resistance to access audits — whether through delayed responses, incomplete submissions, or procedural objections — is a control-retention signal. In financial environments, this creates insider threat conditions that compound over time. The governance response must be firm but non-adversarial: access review is organizational hygiene, not personal investigation. Frame it as protection for the individual, not surveillance of them.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Compliance_Theater",
+    "severity_range": [1, 5],
+    "organizational_context": "enterprise",
+    "role_context": "compliance team",
+    "moment_context": "audit score discrepancy",
+    "response_text": "Audit scores are high. Breach indicators are also high. These two facts cannot both be true in a genuinely compliant environment. The compliance process has become a performance — executed correctly on paper while the underlying behaviors remain unchanged. This is the most dangerous pattern because it generates confidence in a security posture that does not exist. The response is not more compliance — it is a fundamental reassessment of whether compliance activity is producing security outcomes.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Compliance_Theater",
+    "severity_range": [3, 5],
+    "organizational_context": "healthcare",
+    "role_context": "HIPAA compliance officer",
+    "moment_context": "training completion anomaly",
+    "response_text": "HIPAA training completion rates are near-perfect, but behavioral indicators show no corresponding change in data handling practices. Training has become a checkbox rather than a behavioral intervention. The framework team recommends restructuring training delivery: replace annual bulk completion with quarterly micro-interventions tied to actual role-specific scenarios. Measure behavioral change, not completion rates.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Compliance_Theater",
+    "severity_range": [1, 3],
+    "organizational_context": "education",
+    "role_context": "department chair",
+    "moment_context": "IRB compliance pattern",
+    "response_text": "IRB submissions show consistent approval with minimal revision requests — a pattern that suggests either exceptional protocol design or insufficient review depth. Given the volume, the latter is more likely. The compliance process is functioning procedurally but not substantively. Review depth, not throughput, should be the primary metric for the next assessment cycle.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Fatigue",
+    "severity_range": [1, 5],
+    "organizational_context": "retail",
+    "role_context": "store operations",
+    "moment_context": "seasonal volume spike",
+    "response_text": "Seasonal transaction volume has pushed security review into automated approval mode. The team is not ignoring protocols — they are being overwhelmed by the volume of approvals required. Temporarily increase automated pre-screening thresholds for low-risk transactions while maintaining manual review for high-risk patterns. Reduce the noise so the team can focus on the signals that matter.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Quiet_Fear",
+    "severity_range": [1, 3],
+    "organizational_context": "healthcare",
+    "role_context": "clinical staff",
+    "moment_context": "incident under-reporting",
+    "response_text": "Clinical incident reporting frequency is lower than expected given the access volume and operational complexity. In clinical environments, this often reflects concern about professional consequences rather than absence of reportable events. Establish a reporting mechanism that separates learning from blame. The goal is complete visibility into what is happening — not attribution for who caused it.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  },
+  {
+    "drift_pattern": "Hurry",
+    "severity_range": [1, 3],
+    "organizational_context": "government",
+    "role_context": "procurement officer",
+    "moment_context": "fiscal year-end pressure",
+    "response_text": "Fiscal year-end pressure has compressed approval timelines for system changes and procurements. The urgency is real, but the validation shortcuts create configuration gaps that persist well beyond the fiscal deadline. Where possible, stage changes for post-deadline implementation with proper validation rather than rushing everything through before the cutoff.",
+    "is_placeholder": true,
+    "approval_status": "approved"
+  }
+]

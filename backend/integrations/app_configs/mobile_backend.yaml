@@ -1,0 +1,43 @@
+app:
+  name: "mobile_backend"
+  type: "mobile_backend"
+  domain: "enterprise"
+  description: "Mobile application backend — iOS, Android, React Native, Flutter backends"
+
+signals:
+  - type: "access_log"
+    sources: ["mobile-auth", "push-service", "api-gateway"]
+    maps_to: ["Fatigue", "Hoarding"]
+    nist_controls: ["AC-2", "CA-7"]
+    description: "Mobile authentication, device trust, API access patterns"
+
+  - type: "incident_response"
+    sources: ["crash-reporting", "anomaly-detection"]
+    maps_to: ["Hurry", "Quiet_Fear"]
+    nist_controls: ["IR-6"]
+    description: "App crashes, anomalous behavior, security alerts"
+
+  - type: "approval_workflow"
+    sources: ["app-store-deploy", "feature-flags"]
+    maps_to: ["Hurry", "Overconfidence"]
+    nist_controls: ["AU-6"]
+    description: "App releases, feature flag changes, A/B test configs"
+
+  - type: "training_completion"
+    sources: ["security-training", "compliance-module"]
+    maps_to: ["Compliance_Theater"]
+    nist_controls: ["AT-2"]
+    description: "Developer security training, compliance certifications"
+
+thresholds:
+  confidence: 0.70
+  alert_rules:
+    critical_patterns: 3
+    warning_patterns: 2
+    acceleration_threshold: 1.5
+  temporal:
+    lookback_days: 14
+    half_life_days: 3.0
+
+delivery:
+  methods: ["dashboard", "slack"]

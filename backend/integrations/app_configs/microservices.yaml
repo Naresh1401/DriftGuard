@@ -1,0 +1,50 @@
+app:
+  name: "microservices"
+  type: "microservices"
+  domain: "enterprise"
+  description: "Microservices architecture — Kubernetes, Docker, service mesh environments"
+
+signals:
+  - type: "access_log"
+    sources: ["service-mesh", "api-gateway", "identity-provider"]
+    maps_to: ["Fatigue", "Hoarding", "Overconfidence"]
+    nist_controls: ["AC-2", "CA-7"]
+    description: "Service-to-service auth, mTLS, RBAC changes"
+
+  - type: "audit_review"
+    sources: ["config-management", "secret-manager", "policy-engine"]
+    maps_to: ["Fatigue", "Compliance_Theater"]
+    nist_controls: ["AU-6", "CA-7"]
+    description: "Config changes, secret rotations, policy updates"
+
+  - type: "incident_response"
+    sources: ["observability-stack", "alertmanager", "pagerduty"]
+    maps_to: ["Hurry", "Quiet_Fear", "Fatigue"]
+    nist_controls: ["IR-6", "CA-7"]
+    description: "Service alerts, SLA violations, cascading failures"
+
+  - type: "approval_workflow"
+    sources: ["ci-cd-pipeline", "gitops", "change-management"]
+    maps_to: ["Hurry", "Overconfidence"]
+    nist_controls: ["AU-6"]
+    description: "Deployments, rollbacks, infrastructure changes"
+
+  - type: "communication"
+    sources: ["incident-channel", "runbook-system"]
+    maps_to: ["Quiet_Fear"]
+    nist_controls: ["IR-6"]
+    description: "On-call handoffs, incident communications"
+
+thresholds:
+  confidence: 0.65
+  alert_rules:
+    critical_patterns: 3
+    warning_patterns: 2
+    acceleration_threshold: 1.3
+  temporal:
+    lookback_days: 7
+    half_life_days: 2.0
+    acceleration_window_days: 3
+
+delivery:
+  methods: ["dashboard", "slack", "email"]

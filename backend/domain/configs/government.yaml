@@ -1,0 +1,65 @@
+# DriftGuard Domain Configuration — Government
+# Highest drift risk: Quiet Fear and Compliance Theater due to reporting culture.
+
+domain: government
+display_name: Government
+description: >
+  Government agencies at federal, state, and local levels. Covers
+  document access, classification handling, approval chains, and
+  FOIA response patterns.
+
+signals:
+  - type: document_access_logs
+    maps_to: [Hoarding, Overconfidence]
+    nist_controls: [AC-2, CA-7]
+    description: Classified and sensitive document access patterns
+    source_connector: cloudtrail
+
+  - type: classification_handling_patterns
+    maps_to: [Compliance_Theater, Quiet_Fear]
+    nist_controls: [AU-6, CA-7]
+    description: Document classification adherence, handling violations, downgrade requests
+    source_connector: custom
+
+  - type: approval_chains
+    maps_to: [Hurry, Overconfidence]
+    nist_controls: [AC-2, AU-6]
+    description: Multi-level approval workflows — bypass frequency, compressed windows
+    source_connector: custom
+
+  - type: foia_response_patterns
+    maps_to: [Quiet_Fear, Compliance_Theater]
+    nist_controls: [IR-6, CA-7]
+    description: FOIA response completeness, redaction patterns, delay frequency
+    source_connector: custom
+
+  - type: incident_reporting
+    maps_to: [Quiet_Fear, Fatigue]
+    nist_controls: [IR-6, AU-6]
+    description: Security incident reports — frequency, depth, escalation patterns
+    source_connector: sentinel
+
+  - type: training_compliance
+    maps_to: [Compliance_Theater, Fatigue]
+    nist_controls: [AT-2, AU-6]
+    description: Mandatory security training completion and behavioral outcomes
+    source_connector: custom
+
+priority_controls: [IR-6, CA-7, AU-6]
+alert_sensitivity: conservative
+response_delivery: [dashboard, email]
+
+compliance:
+  fisma_compliant: true
+  fedramp: true
+  audit_trail_required: true
+
+highest_drift_risks:
+  - Quiet_Fear
+  - Compliance_Theater
+
+risk_notes: >
+  Government reporting culture creates elevated Quiet Fear risk —
+  employees may know of issues but fear career consequences of
+  surfacing them. Compliance Theater is the secondary risk because
+  regulatory and audit volume incentivizes performative compliance.

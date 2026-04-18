@@ -1,0 +1,64 @@
+# DriftGuard Domain Configuration — Retail
+# Highest drift risk: Hurry and Overconfidence due to volume and speed pressure.
+
+domain: retail
+display_name: Retail
+description: >
+  Retail organizations including brick-and-mortar, e-commerce, and
+  omnichannel operations. Covers POS access, inventory systems,
+  vendor approvals, and return authorizations.
+
+signals:
+  - type: pos_access_logs
+    maps_to: [Fatigue, Hurry]
+    nist_controls: [AU-6, AC-2]
+    description: Point-of-sale system access patterns — frequency, after-hours, overrides
+    source_connector: splunk
+
+  - type: inventory_access_patterns
+    maps_to: [Hoarding, Overconfidence]
+    nist_controls: [AC-2, CA-7]
+    description: Inventory management system access breadth and retention
+    source_connector: custom
+
+  - type: vendor_approval_workflows
+    maps_to: [Hurry, Overconfidence]
+    nist_controls: [AC-2, AU-6]
+    description: Vendor onboarding and payment approval patterns
+    source_connector: custom
+
+  - type: return_authorization_patterns
+    maps_to: [Overconfidence, Compliance_Theater]
+    nist_controls: [AU-6, AT-2]
+    description: Return and refund authorization — override frequency, single approvals
+    source_connector: custom
+
+  - type: incident_response
+    maps_to: [Quiet_Fear, Hurry]
+    nist_controls: [IR-6]
+    description: Security incident response times and escalation patterns
+    source_connector: custom
+
+  - type: training_completion
+    maps_to: [Compliance_Theater, Fatigue]
+    nist_controls: [AT-2, AU-6]
+    description: PCI and security training completion rates
+    source_connector: custom
+
+priority_controls: [AU-6, AC-2, IR-6]
+alert_sensitivity: balanced
+response_delivery: [dashboard, push]
+
+compliance:
+  pci_dss: true
+  audit_trail_required: true
+
+highest_drift_risks:
+  - Hurry
+  - Overconfidence
+
+risk_notes: >
+  High transaction volume and speed pressure in retail creates
+  elevated Hurry risk. Authorization overrides driven by customer-
+  facing pressure lead to Overconfidence drift. Seasonal peaks
+  (holidays, sales events) amplify both patterns.

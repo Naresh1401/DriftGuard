@@ -1,0 +1,96 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "driftguard-overview",
+    "title": "DriftGuard — System Overview",
+    "tags": ["driftguard"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Signals Ingested (Rate)",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "rate(driftguard_signals_ingested_total[5m])",
+            "legendFormat": "signals/sec"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Active Alerts by Level",
+        "type": "stat",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "driftguard_active_alerts{level=\"Critical\"}",
+            "legendFormat": "Critical"
+          },
+          {
+            "expr": "driftguard_active_alerts{level=\"Warning\"}",
+            "legendFormat": "Warning"
+          },
+          {
+            "expr": "driftguard_active_alerts{level=\"Watch\"}",
+            "legendFormat": "Watch"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Pipeline Latency (p95)",
+        "type": "gauge",
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(driftguard_pipeline_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95 latency"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Drift Pattern Distribution",
+        "type": "piechart",
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+        "targets": [
+          {
+            "expr": "driftguard_drift_detections_total",
+            "legendFormat": "{{pattern}}"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Organizational Health Score",
+        "type": "gauge",
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+        "targets": [
+          {
+            "expr": "driftguard_health_score",
+            "legendFormat": "Health"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "color": "red", "value": 0 },
+                { "color": "orange", "value": 40 },
+                { "color": "yellow", "value": 60 },
+                { "color": "green", "value": 80 }
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "schemaVersion": 39,
+    "version": 1
+  }
+}

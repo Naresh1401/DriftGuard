@@ -1,0 +1,44 @@
+# DriftGuard .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+venv/
+.env
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Database
+*.db
+*.sqlite3
+
+# Docker
+.docker/
+
+# ML Model Cache
+.cache/
+*.onnx
+*.bin
+*.pt
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

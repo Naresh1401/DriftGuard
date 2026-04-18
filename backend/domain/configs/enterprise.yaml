@@ -1,0 +1,78 @@
+# DriftGuard Domain Configuration — Enterprise
+# All six drift patterns active.
+# Highest risk: Compliance Theater masking all other patterns.
+
+domain: enterprise
+display_name: Enterprise (General)
+description: >
+  General enterprise environment covering all standard organizational
+  signal types. Suitable for technology companies, professional services,
+  manufacturing, and any organization not covered by a specific vertical.
+  All six drift patterns are actively monitored.
+
+signals:
+  - type: access_logs
+    maps_to: [Fatigue, Overconfidence, Hoarding]
+    nist_controls: [AU-6, AC-2, CA-7]
+    description: System and application access logs — frequency, breadth, role match
+    source_connector: splunk
+
+  - type: email_communication_patterns
+    maps_to: [Quiet_Fear, Overconfidence]
+    nist_controls: [IR-6, CA-7]
+    description: Communication escalation chains, reporting frequency, unusual silences
+    source_connector: google_workspace
+
+  - type: code_commit_histories
+    maps_to: [Hurry, Overconfidence]
+    nist_controls: [AU-6, IR-6]
+    description: Code commit patterns — review bypass, force pushes, rushed merges
+    source_connector: custom
+
+  - type: access_review_completion
+    maps_to: [Fatigue, Compliance_Theater]
+    nist_controls: [AC-2, AU-6]
+    description: Periodic access review engagement and outcome variance
+    source_connector: sentinel
+
+  - type: incident_response_workflows
+    maps_to: [Quiet_Fear, Hurry, Fatigue]
+    nist_controls: [IR-6, AU-6]
+    description: Incident detection to response time, escalation patterns, silence duration
+    source_connector: custom
+
+  - type: change_management_logs
+    maps_to: [Hurry, Overconfidence]
+    nist_controls: [AU-6, CA-7]
+    description: Change requests — approval speed, validation completeness, rollback frequency
+    source_connector: custom
+
+  - type: approval_workflows
+    maps_to: [Overconfidence, Hurry, Fatigue]
+    nist_controls: [AC-2, AU-6]
+    description: General approval workflows — exception frequency, single-approver decisions
+    source_connector: custom
+
+  - type: training_completion
+    maps_to: [Compliance_Theater, Fatigue]
+    nist_controls: [AT-2, AU-6]
+    description: Security awareness training completion and behavioral change metrics
+    source_connector: custom
+
+priority_controls: [AU-6, AC-2, CA-7, IR-6, AT-2]
+alert_sensitivity: balanced
+response_delivery: [dashboard, email, slack]
+
+compliance:
+  soc2: true
+  audit_trail_required: true
+
+highest_drift_risks:
+  - Compliance_Theater
+
+risk_notes: >
+  Enterprise environments face all six drift patterns simultaneously.
+  The highest risk is Compliance Theater masking all other patterns —
+  when every audit looks clean but drift is accumulating underneath.
+  This makes enterprise the most complex domain to monitor because
+  the most dangerous pattern is the one that hides the others.

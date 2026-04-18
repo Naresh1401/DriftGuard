@@ -1,0 +1,55 @@
+app:
+  name: "saas_platform"
+  type: "saas_platform"
+  domain: "enterprise"
+  description: "SaaS platform — multi-tenant B2B/B2C applications, API platforms"
+
+signals:
+  - type: "access_log"
+    sources: ["auth-service", "tenant-management", "api-gateway"]
+    maps_to: ["Fatigue", "Hoarding", "Overconfidence"]
+    nist_controls: ["AC-2", "CA-7"]
+    description: "Tenant authentication, cross-tenant access, API key management"
+
+  - type: "audit_review"
+    sources: ["admin-console", "soc2-compliance", "data-governance"]
+    maps_to: ["Fatigue", "Compliance_Theater"]
+    nist_controls: ["AU-6", "AT-2", "CA-7"]
+    description: "SOC2 controls, data access reviews, tenant isolation checks"
+
+  - type: "incident_response"
+    sources: ["security-scanner", "waf", "abuse-detection"]
+    maps_to: ["Hurry", "Quiet_Fear"]
+    nist_controls: ["IR-6", "CA-7"]
+    description: "WAF alerts, abuse detection, data breach indicators"
+
+  - type: "approval_workflow"
+    sources: ["feature-deploy", "database-migration", "infrastructure"]
+    maps_to: ["Hurry", "Overconfidence"]
+    nist_controls: ["AU-6"]
+    description: "Production deployments, schema migrations, infra changes"
+
+  - type: "communication"
+    sources: ["security-channel", "customer-support"]
+    maps_to: ["Quiet_Fear"]
+    nist_controls: ["IR-6"]
+    description: "Security-related customer reports, internal escalations"
+
+  - type: "training_completion"
+    sources: ["security-training", "onboarding"]
+    maps_to: ["Compliance_Theater"]
+    nist_controls: ["AT-2"]
+    description: "Employee security training, compliance certifications"
+
+thresholds:
+  confidence: 0.70
+  alert_rules:
+    critical_patterns: 3
+    warning_patterns: 2
+    acceleration_threshold: 1.5
+  temporal:
+    lookback_days: 14
+    half_life_days: 3.0
+
+delivery:
+  methods: ["dashboard", "slack", "email"]
