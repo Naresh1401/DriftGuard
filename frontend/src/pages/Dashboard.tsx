@@ -465,7 +465,9 @@ function NIArchitectDashboard({ health, alerts }: { health: HealthScore; alerts:
 
   useEffect(() => {
     api.getCalibrationResponses().then(responses => {
-      setCalData({ pending: responses.length, total: responses.length, approved: 0 })
+      const pending = responses.filter((r: any) => r.approval_status === 'pending_review' || r.approval_status === 'pending').length
+      const approved = responses.filter((r: any) => r.approval_status === 'approved').length
+      setCalData({ pending, total: responses.length, approved })
     }).catch(() => {})
   }, [])
 

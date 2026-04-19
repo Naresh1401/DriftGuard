@@ -45,6 +45,7 @@ export default function Scans() {
       setScanResult(res.message)
       // Poll for completion (with cleanup)
       let attempts = 0
+      if (pollRef.current) clearInterval(pollRef.current)
       const poll = setInterval(async () => {
         attempts++
         try {

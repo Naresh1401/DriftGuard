@@ -62,6 +62,7 @@ export default function Domains() {
       const detail = await api.getDomain(domainName)
       setExpandedDetail(detail)
     } catch {
+      setExpanded(null)
       setExpandedDetail(null)
     }
   }

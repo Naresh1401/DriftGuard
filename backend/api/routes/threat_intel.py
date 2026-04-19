@@ -144,7 +144,7 @@ async def correlate_threats(
         for alert in all_alerts:
             alert_patterns = [p.pattern.value for p in alert.drift_patterns]
             if any(tp in alert_patterns for tp in item["drift_patterns"]):
-                matching_alerts.append(alert.alert_id)
+                matching_alerts.append(str(alert.id))
 
         if matching_alerts:
             correlations.append({
