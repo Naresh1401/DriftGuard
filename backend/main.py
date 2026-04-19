@@ -214,6 +214,11 @@ app.include_router(convenience_router, prefix=settings.api_prefix)
 
 @app.get("/")
 async def root():
+    import os as _os
+    _dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+    if _dist.exists() and _os.environ.get("ENVIRONMENT") == "production":
+        from fastapi.responses import FileResponse
+        return FileResponse(str(_dist / "index.html"))
     return {
         "service": "DriftGuard",
         "version": "1.0.0",
