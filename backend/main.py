@@ -142,6 +142,7 @@ _cors_origins = settings.cors_origins.split(",") if hasattr(settings, "cors_orig
     "https://driftguard-eight.vercel.app", "https://driftguard.vercel.app",
     "https://driftguard-naresh1401.vercel.app", "https://driftguard-api.onrender.com",
     "https://driftguard-api-p0l5.onrender.com",
+    "https://driftguard-api-a0vq.onrender.com",
 ]
 app.add_middleware(
     CORSMiddleware,

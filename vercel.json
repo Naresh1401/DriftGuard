@@ -3,6 +3,6 @@
   "outputDirectory": "frontend/dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://driftguard-api-p0l5.onrender.com/api/:path*" }
+    { "source": "/api/:path*", "destination": "https://driftguard-api-a0vq.onrender.com/api/:path*" }
   ]
 }
