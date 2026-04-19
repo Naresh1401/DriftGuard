@@ -202,7 +202,7 @@ async def get_health_score(
     critical = sum(1 for a in all_alerts if a.alert_level == AlertLevel.CRITICAL)
     warning = sum(1 for a in all_alerts if a.alert_level == AlertLevel.WARNING)
     watch = sum(1 for a in all_alerts if a.alert_level == AlertLevel.WATCH)
-    patterns = len({a.drift_pattern for a in all_alerts})
+    patterns = len({p.pattern for a in all_alerts for p in a.drift_patterns})
 
     # Determine trend based on recent alert count
     if critical > 0:

@@ -10,10 +10,10 @@ from pipeline.agents import AgentState, DriftPatternAgent
 
 class ComplianceTheaterAgent(DriftPatternAgent):
 
-    def analyze(self, state: AgentState) -> AgentState:
-        signals = self._filter_relevant_signals(state.signals)
+    def analyze(self, state: AgentState) -> dict:
+        signals = self._filter_relevant_signals(state.get("signals", []))
         if not signals:
-            return state
+            return {}
 
         score = 0.0
         evidence: list[str] = []
@@ -69,7 +69,7 @@ class ComplianceTheaterAgent(DriftPatternAgent):
             evidence.append("Incident rate unchanged despite active compliance program")
             severity_val = max(severity_val, 3)
 
-        tw = state.temporal_weights.get(DriftPatternType.COMPLIANCE_THEATER.value, 1.0)
+        tw = state.get("temporal_weights", {}).get(DriftPatternType.COMPLIANCE_THEATER.value, 1.0)
         score = min(score * tw, 1.0)
 
         if score >= 0.15:
@@ -82,6 +82,6 @@ class ComplianceTheaterAgent(DriftPatternAgent):
                 temporal_weight=tw,
                 reasoning=" | ".join(evidence),
             )
-            state.classifications.append(cls)
+            return {"classifications": [cls]}
 
-        return state
+        return {}

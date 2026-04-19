@@ -118,13 +118,17 @@ class DriftGuardPipeline:
         processed = self._ingestion.ingest_batch(signals)
         logger.info(f"Ingested {len(processed)} signals (anonymized)")
 
-        # Step 2: Build initial state
-        state = AgentState(
-            signals=processed,
-            team_id=team_id,
-            system_id=system_id,
-            domain=domain,
-        )
+        # Step 2: Build initial state as dict (TypedDict-compatible)
+        state: AgentState = {
+            "signals": processed,
+            "temporal_weights": {},
+            "acceleration_data": {},
+            "classifications": [],
+            "team_id": team_id,
+            "system_id": system_id,
+            "domain": domain or "enterprise",
+            "errors": [],
+        }
 
         # Step 3: Run through graph or built-in orchestration
         if self._graph is not None:
@@ -143,67 +147,78 @@ class DriftGuardPipeline:
     def _run_builtin(self, state: AgentState) -> AgentState:
         """Built-in sequential orchestration fallback."""
         # Ingest node
-        state = self._ingest_node(state)
+        state = {**state, **self._ingest_node(state)}
 
         # Temporal weighting
-        state = self._temporal_weight_node(state)
+        state = {**state, **self._temporal_weight_node(state)}
 
-        # Run all agents
+        # Run all agents sequentially, merging classifications
         for agent in self._agents.values():
-            state = agent.analyze(state)
+            partial = agent.analyze(state)
+            if partial and "classifications" in partial:
+                state["classifications"] = state.get("classifications", []) + partial["classifications"]
 
         # Aggregate
-        state = self._aggregate_node(state)
+        state = {**state, **self._aggregate_node(state)}
 
         return state
 
-    def _ingest_node(self, state: AgentState) -> AgentState:
+    def _ingest_node(self, state: AgentState) -> dict:
         """No-op here since ingestion already happened in process()."""
-        return state
+        return {}
 
-    def _temporal_weight_node(self, state: AgentState) -> AgentState:
+    def _temporal_weight_node(self, state: AgentState) -> dict:
         """Compute temporal weights and acceleration."""
+        signals = state.get("signals", []) if isinstance(state, dict) else state["signals"]
+        team_id = state.get("team_id") if isinstance(state, dict) else state["team_id"]
+        system_id = state.get("system_id") if isinstance(state, dict) else state["system_id"]
+
         # Record signals for each potential pattern
         for pattern_type in DriftPatternType:
-            self._temporal.record_signals(state.signals, pattern_type)
+            self._temporal.record_signals(signals, pattern_type)
 
-        state.temporal_weights = self._temporal.compute_weights(
-            state.team_id, state.system_id
-        )
-        state.acceleration_data = self._temporal.detect_acceleration(
-            state.team_id, state.system_id
-        )
-        return state
+        temporal_weights = self._temporal.compute_weights(team_id, system_id)
+        acceleration_data = self._temporal.detect_acceleration(team_id, system_id)
+        return {
+            "temporal_weights": temporal_weights,
+            "acceleration_data": acceleration_data,
+        }
 
-    def _aggregate_node(self, state: AgentState) -> AgentState:
+    def _aggregate_node(self, state: AgentState) -> dict:
         """Aggregate classifications from all agents.
 
         Remove duplicates, sort by confidence.
         """
+        classifications = state.get("classifications", []) if isinstance(state, dict) else state["classifications"]
         seen = set()
         unique: List[DriftClassification] = []
-        for cls in state.classifications:
+        for cls in classifications:
             if cls.pattern not in seen:
                 seen.add(cls.pattern)
                 unique.append(cls)
-        state.classifications = sorted(unique, key=lambda c: c.confidence, reverse=True)
-        return state
+        return {"classifications": sorted(unique, key=lambda c: c.confidence, reverse=True)}
 
     def _generate_report(self, state: AgentState) -> DriftReport:
         """Generate the structured JSON drift report."""
-        active = [c for c in state.classifications if c.confidence >= 0.15]
+        classifications = state.get("classifications", []) if isinstance(state, dict) else state["classifications"]
+        acceleration_data = state.get("acceleration_data", {}) if isinstance(state, dict) else state["acceleration_data"]
+        domain = state.get("domain", "enterprise") if isinstance(state, dict) else state["domain"]
+        team_id = state.get("team_id") if isinstance(state, dict) else state["team_id"]
+        system_id = state.get("system_id") if isinstance(state, dict) else state["system_id"]
+
+        active = [c for c in classifications if c.confidence >= 0.15]
         alert_level = self._determine_alert_level(active)
         routing = self._determine_routing(alert_level, active)
 
         # Check acceleration
         any_acceleration = any(
-            data[0] for data in state.acceleration_data.values()
+            data[0] for data in acceleration_data.values()
             if isinstance(data, tuple)
         )
         accel_details = None
         if any_acceleration:
             accel_parts = [
-                data[2] for data in state.acceleration_data.values()
+                data[2] for data in acceleration_data.values()
                 if isinstance(data, tuple) and data[0]
             ]
             accel_details = " | ".join(accel_parts)
@@ -211,9 +226,9 @@ class DriftGuardPipeline:
         return DriftReport(
             id=uuid4(),
             timestamp=datetime.utcnow(),
-            domain=state.domain,
-            team_id=state.team_id,
-            system_id=state.system_id,
+            domain=domain,
+            team_id=team_id,
+            system_id=system_id,
             active_patterns=active,
             alert_level=alert_level,
             acceleration_detected=any_acceleration,

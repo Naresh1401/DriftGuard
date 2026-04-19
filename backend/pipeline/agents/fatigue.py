@@ -20,10 +20,10 @@ class FatigueAgent(DriftPatternAgent):
         "batch_approval_count",    # bulk approvals in single sessions
     }
 
-    def analyze(self, state: AgentState) -> AgentState:
-        signals = self._filter_relevant_signals(state.signals)
+    def analyze(self, state: AgentState) -> dict:
+        signals = self._filter_relevant_signals(state.get("signals", []))
         if not signals:
-            return state
+            return {}
 
         score = 0.0
         evidence: list[str] = []
@@ -60,7 +60,7 @@ class FatigueAgent(DriftPatternAgent):
             severity_val = max(severity_val, 3)
 
         # Indicator 4: Declining engagement over time (temporal)
-        tw = state.temporal_weights.get(DriftPatternType.FATIGUE.value, 1.0)
+        tw = state.get("temporal_weights", {}).get(DriftPatternType.FATIGUE.value, 1.0)
         if tw > 1.2:
             score += 0.15
             evidence.append(f"Temporal weight {tw:.2f} — pattern accelerating")
@@ -83,9 +83,9 @@ class FatigueAgent(DriftPatternAgent):
                 temporal_weight=tw,
                 reasoning=" | ".join(evidence),
             )
-            state.classifications.append(cls)
+            return {"classifications": [cls]}
 
-        return state
+        return {}
 
     @staticmethod
     def _avg_feature(signals: List[ProcessedSignal], key: str) -> float | None:

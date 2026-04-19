@@ -9,10 +9,10 @@ from pipeline.agents import AgentState, DriftPatternAgent
 
 class HurryAgent(DriftPatternAgent):
 
-    def analyze(self, state: AgentState) -> AgentState:
-        signals = self._filter_relevant_signals(state.signals)
+    def analyze(self, state: AgentState) -> dict:
+        signals = self._filter_relevant_signals(state.get("signals", []))
         if not signals:
-            return state
+            return {}
 
         score = 0.0
         evidence: list[str] = []
@@ -53,7 +53,7 @@ class HurryAgent(DriftPatternAgent):
             score += 0.1
             evidence.append(f"{len(off_hours)} off-hours events — deadline pressure")
 
-        tw = state.temporal_weights.get(DriftPatternType.HURRY.value, 1.0)
+        tw = state.get("temporal_weights", {}).get(DriftPatternType.HURRY.value, 1.0)
         score = min(score * tw, 1.0)
 
         if score >= 0.15:
@@ -66,6 +66,6 @@ class HurryAgent(DriftPatternAgent):
                 temporal_weight=tw,
                 reasoning=" | ".join(evidence),
             )
-            state.classifications.append(cls)
+            return {"classifications": [cls]}
 
-        return state
+        return {}

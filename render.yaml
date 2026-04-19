@@ -4,7 +4,7 @@ services:
     name: driftguard-api
     runtime: python
     plan: free
-    buildCommand: cd backend && pip install -r requirements.txt
+    buildCommand: cd backend && pip install -r requirements-deploy.txt
     startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: ENVIRONMENT
@@ -14,7 +14,7 @@ services:
       - key: DATABASE_URL
         value: sqlite+aiosqlite:///./driftguard.db
       - key: CORS_ORIGINS
-        value: https://driftguard-eight.vercel.app,https://driftguard.vercel.app,https://driftguard-naresh1401.vercel.app,https://driftguard-api-p0l5.onrender.com
+        value: https://driftguard.onrender.com,https://driftguard-frontend.onrender.com
       - key: PYTHON_VERSION
         value: 3.11.6
 
@@ -23,12 +23,13 @@ services:
     name: driftguard
     runtime: static
     plan: free
-    buildCommand: cd frontend && npm install && npm run build
+    buildCommand: cd frontend && npm install && VITE_API_URL=https://driftguard-api.onrender.com npm run build
     staticPublishPath: frontend/dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
     routes:
-      - type: rewrite
-        source: /api/*
-        destination: https://driftguard-api-p0l5.onrender.com/api/*
       - type: rewrite
         source: /*
         destination: /index.html

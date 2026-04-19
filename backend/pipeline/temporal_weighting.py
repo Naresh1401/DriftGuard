@@ -141,13 +141,14 @@ class TemporalWeightingEngine:
 
         now = datetime.utcnow()
         cutoff = now - timedelta(days=self._lookback_days)
-        recent = [t for t in timestamps if t >= cutoff]
+        # Normalize: strip tzinfo so naive/aware timestamps can be compared
+        recent = [t for t in timestamps if t.replace(tzinfo=None) >= cutoff]
 
         if not recent:
             return 0.0
 
         decay_rate = np.log(2) / self._half_life_days
-        ages = np.array([(now - t).total_seconds() / 86400.0 for t in recent])
+        ages = np.array([(now - t.replace(tzinfo=None)).total_seconds() / 86400.0 for t in recent])
         weights = np.exp(-decay_rate * ages)
 
         return float(np.sum(weights))

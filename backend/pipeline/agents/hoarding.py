@@ -10,10 +10,10 @@ from pipeline.agents import AgentState, DriftPatternAgent
 
 class HoardingAgent(DriftPatternAgent):
 
-    def analyze(self, state: AgentState) -> AgentState:
-        signals = self._filter_relevant_signals(state.signals)
+    def analyze(self, state: AgentState) -> dict:
+        signals = self._filter_relevant_signals(state.get("signals", []))
         if not signals:
-            return state
+            return {}
 
         score = 0.0
         evidence: list[str] = []
@@ -56,7 +56,7 @@ class HoardingAgent(DriftPatternAgent):
             evidence.append(f"{len(cross_dept)} cross-department access events")
             severity_val = max(severity_val, 2)
 
-        tw = state.temporal_weights.get(DriftPatternType.HOARDING.value, 1.0)
+        tw = state.get("temporal_weights", {}).get(DriftPatternType.HOARDING.value, 1.0)
         score = min(score * tw, 1.0)
 
         if score >= 0.15:
@@ -69,6 +69,6 @@ class HoardingAgent(DriftPatternAgent):
                 temporal_weight=tw,
                 reasoning=" | ".join(evidence),
             )
-            state.classifications.append(cls)
+            return {"classifications": [cls]}
 
-        return state
+        return {}

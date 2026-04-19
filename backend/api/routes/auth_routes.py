@@ -12,8 +12,10 @@ from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.middleware.auth import get_current_user
 from config.settings import settings
 from db.database import UserRecord, get_db
+from models import User
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -255,10 +257,8 @@ async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(request: Request, db: AsyncSession = Depends(get_db)):
+async def get_me(user: User = Depends(get_current_user)):
     """Get current user profile from token."""
-    from api.middleware.auth import get_current_user
-    user = await get_current_user(request)
     return UserResponse(
         email=user.email,
         full_name=user.full_name,

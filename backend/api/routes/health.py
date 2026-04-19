@@ -19,10 +19,33 @@ async def health_check():
         registered_apps = len(_registered_apps)
         app_configs = len(app_state.app_registry.list_apps()) if hasattr(app_state, 'app_registry') else 0
 
+    # Check database connectivity
+    db_status = "connected"
+    try:
+        from db.database import engine
+        from sqlalchemy import text
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception:
+        db_status = "disconnected"
+
+    # Check vector DB (Qdrant) connectivity
+    vector_db_status = "disconnected"
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            resp = await client.get("http://localhost:6333/healthz")
+            if resp.status_code == 200:
+                vector_db_status = "connected"
+    except Exception:
+        vector_db_status = "disconnected"
+
     return {
         "status": "healthy",
         "service": "DriftGuard",
         "version": "1.0.0",
+        "database": db_status,
+        "vector_db": vector_db_status,
         "ethical_banner": ETHICAL_BANNER,
         "universal_layer": True,
         "registered_apps": registered_apps,

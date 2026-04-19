@@ -5,8 +5,9 @@ Agents are orchestrated by LangGraph.
 """
 from __future__ import annotations
 
+import operator
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional, TypedDict
 
 from core.drift_patterns import DRIFT_PATTERNS, DriftPatternDefinition
 from models import (
@@ -18,17 +19,33 @@ from models import (
 from pipeline.classifier import DriftClassifier
 
 
-@dataclass
-class AgentState:
-    """Shared state passed between agents in the LangGraph pipeline."""
-    signals: List[ProcessedSignal] = field(default_factory=list)
-    temporal_weights: Dict[str, float] = field(default_factory=dict)
-    acceleration_data: Dict[str, Any] = field(default_factory=dict)
-    classifications: List[DriftClassification] = field(default_factory=list)
-    team_id: Optional[str] = None
-    system_id: Optional[str] = None
-    domain: str = "enterprise"
-    errors: List[str] = field(default_factory=list)
+def _merge_dicts(a: Dict, b: Dict) -> Dict:
+    """Merge two dicts, keeping the latest non-empty value."""
+    merged = {**a}
+    for k, v in b.items():
+        if v:  # only overwrite with non-empty values
+            merged[k] = v
+    return merged
+
+
+def _keep_latest_str(a: str, b: str) -> str:
+    return b if b else a
+
+
+class AgentState(TypedDict, total=False):
+    """Shared state passed between agents in the LangGraph pipeline.
+
+    Uses TypedDict with Annotated reducers so LangGraph can properly
+    handle concurrent writes from parallel agent fan-out.
+    """
+    signals: Annotated[List[ProcessedSignal], operator.add]
+    temporal_weights: Annotated[Dict[str, float], _merge_dicts]
+    acceleration_data: Annotated[Dict[str, Any], _merge_dicts]
+    classifications: Annotated[List[DriftClassification], operator.add]
+    team_id: Optional[str]
+    system_id: Optional[str]
+    domain: str
+    errors: Annotated[List[str], operator.add]
 
 
 class DriftPatternAgent:
@@ -47,32 +64,39 @@ class DriftPatternAgent:
     def name(self) -> str:
         return f"{self.pattern_type.value}_agent"
 
-    def analyze(self, state: AgentState) -> AgentState:
+    def analyze(self, state: AgentState) -> dict:
         """Analyze signals for this drift pattern.
 
         This is the function called by LangGraph for each agent node.
+        Returns a partial state dict so LangGraph can merge via reducers.
         """
-        relevant_signals = self._filter_relevant_signals(state.signals)
+        signals = state.get("signals", [])
+        temporal_weights = state.get("temporal_weights", {})
+        acceleration_data = state.get("acceleration_data", {})
+
+        relevant_signals = self._filter_relevant_signals(signals)
 
         if not relevant_signals:
-            return state
+            return {}  # no update
+
+        classifications_out: List[DriftClassification] = []
 
         classifications = self._classifier.classify(
             signals=relevant_signals,
-            temporal_weights=state.temporal_weights,
+            temporal_weights=temporal_weights,
         )
 
         # Keep only the classification for our pattern type
         for cls in classifications:
             if cls.pattern == self.pattern_type:
                 # Enrich with acceleration data
-                accel = state.acceleration_data.get(self.pattern_type.value, (False, 0.0, ""))
+                accel = acceleration_data.get(self.pattern_type.value, (False, 0.0, ""))
                 if accel and accel[0]:
                     cls.reasoning += f" | ACCELERATION: {accel[2]}"
-                state.classifications.append(cls)
+                classifications_out.append(cls)
                 break
 
-        return state
+        return {"classifications": classifications_out} if classifications_out else {}
 
     def _filter_relevant_signals(
         self, signals: List[ProcessedSignal]

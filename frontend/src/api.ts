@@ -38,9 +38,26 @@ export const api = {
   health: () => request<{ status: string }>('/health'),
 
   // Alerts
-  getAlerts: (params?: Record<string, string>) => {
+  getAlerts: async (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-    return request<{ alerts: import('./types').Alert[]; total: number }>(`/alerts${qs}`)
+    const raw = await request<{ alerts: any[]; total: number }>(`/alerts${qs}`)
+    return {
+      total: raw.total,
+      alerts: raw.alerts.map((a: any) => ({
+        alert_id: a.id || a.alert_id,
+        drift_pattern: a.drift_patterns?.[0]?.pattern || a.drift_pattern || 'Unknown',
+        alert_level: a.alert_level,
+        severity: typeof a.severity_score === 'number' ? a.severity_score : (a.severity ?? 1),
+        confidence: a.confidence_score ?? a.confidence ?? 0,
+        department: a.team_id || a.department || 'organization',
+        plain_language: a.plain_language_explanation || a.plain_language || '',
+        nist_controls: (a.nist_controls_at_risk || a.nist_controls || []).map((c: any) => typeof c === 'string' ? c : c?.value || c),
+        recommended_action: a.calibration_recommendation || a.recommended_action || 'Review and assess',
+        created_at: a.created_at,
+        acknowledged: a.status === 'acknowledged' || a.acknowledged || false,
+        resolved: a.status === 'resolved' || a.resolved || false,
+      })) as import('./types').Alert[],
+    }
   },
   acknowledgeAlert: (id: string) =>
     request(`/alerts/${id}/action`, { method: 'POST', body: JSON.stringify({ action: 'acknowledge' }) }),
