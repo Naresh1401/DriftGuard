@@ -161,7 +161,7 @@ export default function Layout() {
         </button>
       </div>
 
-      <div className="flex flex-1">
+      <div className="flex flex-1 overflow-hidden">
         {/* Mobile sidebar overlay */}
         {sidebarOpen && (
           <div
