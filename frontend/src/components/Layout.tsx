@@ -170,13 +170,18 @@ export default function Layout() {
           />
         )}
 
-        {/* Sidebar — hidden on mobile, visible on lg+ */}
+        {/* Mobile sidebar drawer */}
         <aside
           className={clsx(
-            'fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 lg:w-64 lg:z-auto',
+            'fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-200 ease-in-out lg:hidden',
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           )}
         >
+          {sidebarContent}
+        </aside>
+
+        {/* Desktop sidebar — always visible on lg+ */}
+        <aside className="hidden lg:flex w-64 bg-white border-r border-gray-200 flex-col shrink-0">
           {sidebarContent}
         </aside>
 
