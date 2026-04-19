@@ -26,11 +26,11 @@ export const api = {
     return request<{ alerts: import('./types').Alert[]; total: number }>(`/alerts${qs}`)
   },
   acknowledgeAlert: (id: string) =>
-    request(`/alerts/${id}/acknowledge`, { method: 'POST' }),
+    request(`/alerts/${id}/action`, { method: 'POST', body: JSON.stringify({ action: 'acknowledge' }) }),
   resolveAlert: (id: string) =>
-    request(`/alerts/${id}/resolve`, { method: 'POST' }),
-  getHealthScore: () =>
-    request<import('./types').HealthScore>('/alerts/health-score'),
+    request(`/alerts/${id}/action`, { method: 'POST', body: JSON.stringify({ action: 'resolve' }) }),
+  getHealthScore: (domain = 'enterprise') =>
+    request<import('./types').HealthScore>(`/alerts/health-score/${domain}`),
 
   // Signals
   ingestSignal: (signal: Record<string, unknown>) =>
@@ -64,7 +64,7 @@ export const api = {
 
   // Calibration
   getCalibrationResponses: () =>
-    request<import('./types').CalibrationResponse[]>('/calibration/responses'),
+    request<{ pending: import('./types').CalibrationResponse[] }>('/calibration/pending-reviews').then(r => r.pending),
   approveCalibration: (id: string) =>
     request(`/calibration/responses/${id}/approve`, { method: 'POST' }),
   rejectCalibration: (id: string) =>
@@ -95,7 +95,7 @@ export const api = {
 
   // Governance
   getPendingActions: () =>
-    request<import('./types').GovernanceAction[]>('/governance/pending'),
+    request<{ pending: import('./types').GovernanceAction[] }>('/governance/gates/pending').then(r => r.pending),
   approveGovernanceAction: (gateType: string, actionId: string) =>
     request(`/governance/${gateType}/${actionId}/approve`, { method: 'POST' }),
   rejectGovernanceAction: (gateType: string, actionId: string) =>
@@ -158,6 +158,8 @@ export const api = {
   // Onboarding
   getOnboardingStatus: () =>
     request<{ steps: import('./types').OnboardingStep[]; completed: boolean }>('/onboarding/status'),
-  completeOnboardingStep: (step: number, data: Record<string, unknown>) =>
-    request(`/onboarding/step/${step}`, { method: 'POST', body: JSON.stringify(data) }),
+  getOnboardingDomains: () =>
+    request<{ domains: Array<{ id: string; name: string; description: string; icon: string }> }>('/onboarding/domains'),
+  completeOnboarding: (data: Record<string, unknown>) =>
+    request('/onboarding/complete', { method: 'POST', body: JSON.stringify(data) }),
 }

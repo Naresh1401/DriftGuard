@@ -96,6 +96,122 @@ async def approve_critical_alert(
     return result
 
 
+# ── Combined Pending Gate Actions ────────────────────
+
+@router.get("/gates/pending")
+async def get_all_pending_gate_actions(
+    user: User = Depends(get_current_user),
+):
+    """Get ALL pending governance actions across all gates."""
+    from main import app_state
+
+    actions = []
+
+    # NIST mapping proposals pending
+    for m in app_state.nist_mapping_gate.get_pending():
+        actions.append({
+            "action_id": m.get("id", str(id(m))),
+            "gate_type": "nist_mapping",
+            "status": "pending",
+            "submitted_at": m.get("proposed_at", ""),
+            "reviewed_at": None,
+            "reviewer": None,
+            "details": m,
+        })
+
+    # Critical alert reviews pending
+    for r in app_state.critical_review_gate.get_pending():
+        actions.append({
+            "action_id": r.get("alert_id", str(id(r))),
+            "gate_type": "critical_alert",
+            "status": "pending",
+            "submitted_at": r.get("submitted_at", ""),
+            "reviewed_at": None,
+            "reviewer": None,
+            "details": r,
+        })
+
+    # NI response reviews pending
+    for resp in app_state.ni_approval_gate.get_pending_reviews():
+        actions.append({
+            "action_id": str(resp.id),
+            "gate_type": "ni_response",
+            "status": "pending",
+            "submitted_at": resp.created_at.isoformat() if hasattr(resp, 'created_at') else "",
+            "reviewed_at": None,
+            "reviewer": None,
+            "details": {
+                "response_id": str(resp.id),
+                "pattern": resp.drift_pattern.value if hasattr(resp.drift_pattern, 'value') else str(resp.drift_pattern),
+                "context": resp.organizational_context if hasattr(resp, 'organizational_context') else "",
+            },
+        })
+
+    return {"pending": actions}
+
+
+# ── Approve / Reject Actions ────────────────────────
+
+@router.post("/{gate_type}/{action_id}/approve")
+async def approve_gate_action(
+    gate_type: str,
+    action_id: str,
+    user: User = Depends(require_role(
+        UserRole.CISO, UserRole.GOVERNANCE_ARCHITECT, UserRole.ADMIN
+    )),
+):
+    """Approve a governance gate action."""
+    from main import app_state
+
+    if gate_type == "nist_mapping":
+        result = app_state.nist_mapping_gate.approve_mapping(action_id, user.email)
+    elif gate_type == "critical_alert":
+        result = app_state.critical_review_gate.approve(action_id, user.email)
+        if result:
+            app_state.early_warning.approve_critical_alert(action_id, user.email)
+    elif gate_type == "ni_response":
+        result = app_state.ni_approval_gate.approve(action_id, user.email)
+        if result:
+            app_state.content_api.approve_response(action_id, user.email)
+    else:
+        from fastapi import HTTPException as HE
+        raise HE(status_code=400, detail=f"Unknown gate type: {gate_type}")
+
+    if not result:
+        from fastapi import HTTPException as HE
+        raise HE(status_code=404, detail="Action not found")
+
+    app_state.audit_logger.log(
+        AuditAction.HUMAN_REVIEW_APPROVED,
+        actor=user.email,
+        resource_type=gate_type,
+        details={"action_id": action_id},
+    )
+    return {"status": "approved", "gate_type": gate_type, "action_id": action_id}
+
+
+@router.post("/{gate_type}/{action_id}/reject")
+async def reject_gate_action(
+    gate_type: str,
+    action_id: str,
+    user: User = Depends(require_role(
+        UserRole.CISO, UserRole.GOVERNANCE_ARCHITECT, UserRole.ADMIN
+    )),
+):
+    """Reject a governance gate action."""
+    from main import app_state
+
+    # For now mark as rejected in audit log — the specific gates
+    # don't all have reject methods yet, so we log it.
+    app_state.audit_logger.log(
+        AuditAction.HUMAN_REVIEW_REJECTED,
+        actor=user.email,
+        resource_type=gate_type,
+        details={"action_id": action_id, "reason": "Rejected via governance UI"},
+    )
+    return {"status": "rejected", "gate_type": gate_type, "action_id": action_id}
+
+
 # ── Audit Log Endpoints ──────────────────────────────
 
 @router.get("/audit-log")

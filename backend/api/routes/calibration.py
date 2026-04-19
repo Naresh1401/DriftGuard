@@ -96,6 +96,32 @@ async def approve_response(
     return {"response_id": response_id, "status": "approved"}
 
 
+@router.post("/responses/{response_id}/reject")
+async def reject_response(
+    response_id: str,
+    user: User = Depends(require_role(UserRole.FRAMEWORK_TEAM, UserRole.ADMIN)),
+):
+    """Framework team rejects a calibration response."""
+    from main import app_state
+
+    # Log the rejection
+    app_state.audit_logger.log(
+        AuditAction.CALIBRATION_REJECTED,
+        actor=user.email,
+        resource_type="calibration_response",
+        details={"response_id": response_id},
+    )
+
+    # Remove from pending reviews if present
+    pending = app_state.ni_approval_gate.get_pending_reviews()
+    for r in pending:
+        if str(r.id) == response_id:
+            r.approval_status = ApprovalStatus.REVISION_REQUESTED
+            return {"response_id": response_id, "status": "rejected"}
+
+    raise HTTPException(status_code=404, detail="Response not found")
+
+
 @router.post("/retrieve")
 async def retrieve_response(
     request: CalibrationRetrieveRequest,

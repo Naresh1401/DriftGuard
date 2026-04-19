@@ -12,6 +12,30 @@ from models import User
 router = APIRouter(prefix="/onboarding", tags=["Onboarding"])
 
 
+# ── Onboarding Status ────────────────────────────────
+
+@router.get("/status")
+async def get_onboarding_status():
+    """Get current onboarding status — check if domain and connectors are configured."""
+    from main import app_state
+
+    has_domain = bool(app_state.domain_registry.get_domain("enterprise"))
+    has_signals = False
+    for scope_alerts in app_state.early_warning._active_alerts.values():
+        if scope_alerts:
+            has_signals = True
+            break
+
+    steps = [
+        {"step": 1, "title": "Select Domain", "description": "Choose your organization type", "completed": has_domain},
+        {"step": 2, "title": "Connect Sources", "description": "Set up signal ingestion", "completed": has_signals},
+        {"step": 3, "title": "Configure Alerts", "description": "Set sensitivity and delivery", "completed": has_domain},
+    ]
+    completed = all(s["completed"] for s in steps)
+
+    return {"steps": steps, "completed": completed}
+
+
 class OnboardingStep1(BaseModel):
     """Step 1: Select domain or upload custom YAML."""
     domain: str  # healthcare, finance, government, retail, education, enterprise, custom

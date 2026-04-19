@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../api'
 import { useAuth } from '../auth'
 import { LoadingSpinner } from '../components/Shared'
@@ -14,6 +14,12 @@ export default function Scans() {
   const [scanResult, setScanResult] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<'scans' | 'schedules'>('scans')
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+  }, [])
 
   const load = async () => {
     try {
@@ -37,15 +43,25 @@ export default function Scans() {
     try {
       const res = await api.triggerScan('enterprise', scope)
       setScanResult(res.message)
-      // Poll for completion
+      // Poll for completion (with cleanup)
+      let attempts = 0
       const poll = setInterval(async () => {
-        const status = await api.getScanStatus()
-        if (!status.active) {
+        attempts++
+        try {
+          const status = await api.getScanStatus()
+          if (!status.active || attempts > 30) {
+            clearInterval(poll)
+            pollRef.current = null
+            setScanning(false)
+            load()
+          }
+        } catch {
           clearInterval(poll)
+          pollRef.current = null
           setScanning(false)
-          load()
         }
       }, 2000)
+      pollRef.current = poll
     } catch (e: unknown) {
       setScanResult(e instanceof Error ? e.message : 'Scan failed')
       setScanning(false)

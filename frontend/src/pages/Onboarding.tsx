@@ -4,6 +4,7 @@ import { useAuth } from '../auth'
 import { CheckCircle, Globe, Shield, Zap } from 'lucide-react'
 import clsx from 'clsx'
 import type { UserRole } from '../types'
+import { api } from '../api'
 
 const STEPS = [
   {
@@ -59,6 +60,13 @@ export default function Onboarding() {
     if (step < 2) {
       setStep(step + 1)
     } else {
+      // Save onboarding to backend
+      api.completeOnboarding({
+        domain: selectedDomain || 'enterprise',
+        step1: { domain: selectedDomain || 'enterprise' },
+        step2: { connectors: selectedConnectors.map(c => ({ connector_type: c, config: {} })), sample_file_mode: false },
+        step3: { alert_sensitivity: 'balanced', priority_nist_controls: [], response_delivery: ['dashboard'] },
+      }).catch(() => { /* proceed even if save fails */ })
       if (selectedRole) setRole(selectedRole)
       navigate('/')
     }
