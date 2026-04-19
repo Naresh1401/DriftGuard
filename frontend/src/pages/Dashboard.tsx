@@ -379,8 +379,8 @@ function CISODashboard({ health, alerts, nistData }: { health: HealthScore; aler
             {liveNistRisk.map((ctrl: any) => (
               <div key={ctrl.control} className="py-2.5 flex items-center gap-3">
                 <span className="font-mono text-sm font-bold text-drift-700 w-14">{ctrl.control}</span>
-                <span className="text-sm text-gray-600 flex-1">{ctrl.label}</span>
-                <div className="w-32 bg-gray-100 rounded-full h-2">
+                <span className="text-sm text-gray-600 flex-1 min-w-0 truncate">{ctrl.label}</span>
+                <div className="w-20 sm:w-32 bg-gray-100 rounded-full h-2 shrink-0">
                   <div
                     className={clsx('h-2 rounded-full',
                       ctrl.risk >= 4 ? 'bg-red-500' : ctrl.risk >= 3 ? 'bg-orange-400' : 'bg-green-500'
@@ -719,7 +719,7 @@ function PatternDistChart({ data }: { data?: Array<{ pattern: string; count: num
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={chartData} layout="vertical">
           <XAxis type="number" tick={{ fontSize: 11 }} />
-          <YAxis dataKey="pattern" type="category" width={130} tick={{ fontSize: 11 }}
+          <YAxis dataKey="pattern" type="category" width={100} tick={{ fontSize: 11 }}
             tickFormatter={(v: string) => v.replace(/_/g, ' ')} />
           <Tooltip />
           <Bar dataKey="count" radius={[0, 4, 4, 0]}>

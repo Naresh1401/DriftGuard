@@ -93,12 +93,12 @@ export default function Onboarding() {
         </div>
 
         {/* Step indicator */}
-        <div className="flex items-center justify-center gap-4 mb-8">
+        <div className="flex items-center justify-center gap-2 sm:gap-4 mb-8">
           {STEPS.map((s, i) => (
-            <div key={i} className="flex items-center gap-2">
+            <div key={i} className="flex items-center gap-1 sm:gap-2">
               <div
                 className={clsx(
-                  'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold',
+                  'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0',
                   i < step
                     ? 'bg-green-500 text-white'
                     : i === step
@@ -108,10 +108,10 @@ export default function Onboarding() {
               >
                 {i < step ? <CheckCircle size={16} /> : i + 1}
               </div>
-              <span className={clsx('text-sm', i === step ? 'text-gray-900 font-medium' : 'text-gray-500')}>
+              <span className={clsx('text-xs sm:text-sm hidden sm:inline', i === step ? 'text-gray-900 font-medium' : 'text-gray-500')}>
                 {s.title}
               </span>
-              {i < 2 && <div className="w-12 h-px bg-gray-300" />}
+              {i < 2 && <div className="w-6 sm:w-12 h-px bg-gray-300" />}
             </div>
           ))}
         </div>

@@ -162,7 +162,7 @@ function ScanResults({ data }: { data: LiveScanResult }) {
           </div>
 
           {/* Severity pills */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {data.summary.critical > 0 && <SevPill sev="critical" count={data.summary.critical} />}
             {data.summary.high > 0 && <SevPill sev="high" count={data.summary.high} />}
             {data.summary.medium > 0 && <SevPill sev="medium" count={data.summary.medium} />}

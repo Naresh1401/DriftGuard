@@ -140,7 +140,7 @@ export default function Calibration() {
             )}
             onClick={() => setExpandedId(expandedId === resp.response_id ? null : resp.response_id)}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <PatternTag pattern={resp.drift_pattern} />
               <span className="text-xs text-gray-500">
                 Severity {resp.severity_range[0]}-{resp.severity_range[1]}

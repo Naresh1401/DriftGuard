@@ -66,7 +66,7 @@ export default function ThreatIntel() {
         </div>
       )}
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
           <button onClick={() => setTab('feed')}
             className={clsx('px-4 py-2 rounded-md text-sm font-medium transition-colors',
