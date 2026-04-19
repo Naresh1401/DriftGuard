@@ -284,3 +284,122 @@ export interface LiveScanResult {
     info: number
   }
 }
+
+// ── Drift Map ───────────────────────────────────────
+export interface DriftHeatmap {
+  domain: string
+  days: number
+  departments: string[]
+  patterns: string[]
+  data: Record<string, Record<DriftPattern, number>>
+}
+
+export interface DriftTrend {
+  pattern: string
+  days: number
+  team_id: string | null
+  data: { date: string; severity: number; confidence: number; alert_level: string }[]
+}
+
+export interface DriftSummary {
+  domain: string
+  health_score: number
+  total_active_alerts: number
+  critical: number
+  warnings: number
+  patterns: Record<string, { count: number; max_severity: number }>
+}
+
+// ── Enhanced Reports ────────────────────────────────
+export interface WeeklyReportData {
+  period: string
+  domain: string
+  health_score: number
+  total_alerts: number
+  critical_count: number
+  warning_count: number
+  watch_count: number
+  pattern_distribution: Record<string, number>
+  nist_controls_at_risk: string[]
+}
+
+export interface NISTRiskData {
+  domain: string
+  controls_at_risk: {
+    control: string
+    alert_count: number
+    max_severity: number
+    patterns: string[]
+    risk_score?: number
+  }[]
+}
+
+export interface BoardSummaryData {
+  domain: string
+  executive_summary: {
+    health_score: number
+    trend: 'improving' | 'stable' | 'degrading'
+    active_critical: number
+    active_warnings: number
+    calibration_responses_delivered: number
+    calibration_acted_upon: number
+  }
+  recommendation: string
+}
+
+// ── Audit ───────────────────────────────────────────
+export interface AuditLogEntry {
+  id: string
+  timestamp: string
+  action: string
+  actor: string | null
+  resource_type: string
+  resource_id: string | null
+  details: Record<string, unknown>
+  ip_address: string | null
+}
+
+// ── Threat Intelligence ──
+export interface ThreatIntelItem {
+  id: string
+  source: string
+  title: string
+  description: string
+  severity: 'critical' | 'high' | 'medium' | 'low'
+  drift_patterns: string[]
+  nist_controls: string[]
+  published: string
+  recommendations: string[]
+}
+
+export interface ThreatCorrelation {
+  threat: ThreatIntelItem
+  matching_alert_count: number
+  alert_ids: string[]
+  risk_level: string
+}
+
+// ── Scans ──
+export interface ScanRecord {
+  scan_id: string
+  domain: string
+  scope: string
+  status: 'running' | 'completed' | 'failed'
+  started_at: string
+  completed_at: string | null
+  signals_processed: number
+  alerts_generated: number
+  triggered_by: string
+}
+
+export interface ScanSchedule {
+  schedule_id: string
+  domain: string
+  scope: string
+  cron_expression: string
+  enabled: boolean
+  created_at: string
+  created_by: string
+  last_run: string | null
+  next_run: string | null
+}

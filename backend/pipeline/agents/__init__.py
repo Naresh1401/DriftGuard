@@ -95,11 +95,30 @@ class DriftPatternAgent:
         return filtered if filtered else signals
 
 
+# ── Specialized Agent Imports ────────────────────────
+
+from pipeline.agents.fatigue import FatigueAgent
+from pipeline.agents.overconfidence import OverconfidenceAgent
+from pipeline.agents.hurry import HurryAgent
+from pipeline.agents.quiet_fear import QuietFearAgent
+from pipeline.agents.hoarding import HoardingAgent
+from pipeline.agents.compliance_theater import ComplianceTheaterAgent
+
+_AGENT_MAP: Dict[DriftPatternType, type] = {
+    DriftPatternType.FATIGUE: FatigueAgent,
+    DriftPatternType.OVERCONFIDENCE: OverconfidenceAgent,
+    DriftPatternType.HURRY: HurryAgent,
+    DriftPatternType.QUIET_FEAR: QuietFearAgent,
+    DriftPatternType.HOARDING: HoardingAgent,
+    DriftPatternType.COMPLIANCE_THEATER: ComplianceTheaterAgent,
+}
+
+
 # ── Agent Factory ────────────────────────────────────
 
 def create_all_agents(classifier: DriftClassifier) -> Dict[DriftPatternType, DriftPatternAgent]:
-    """Create one agent per drift pattern type."""
+    """Create one specialized agent per drift pattern type."""
     return {
-        pattern_type: DriftPatternAgent(pattern_type, classifier)
-        for pattern_type in DriftPatternType
+        pattern_type: agent_cls(pattern_type, classifier)
+        for pattern_type, agent_cls in _AGENT_MAP.items()
     }

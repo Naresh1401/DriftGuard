@@ -96,22 +96,64 @@ export const api = {
   // Governance
   getPendingActions: () =>
     request<import('./types').GovernanceAction[]>('/governance/pending'),
+  approveGovernanceAction: (gateType: string, actionId: string) =>
+    request(`/governance/${gateType}/${actionId}/approve`, { method: 'POST' }),
+  rejectGovernanceAction: (gateType: string, actionId: string) =>
+    request(`/governance/${gateType}/${actionId}/reject`, { method: 'POST' }),
   getAuditLog: (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-    return request<{ entries: unknown[]; total: number }>(`/governance/audit-log${qs}`)
+    return request<{ entries: import('./types').AuditLogEntry[]; total: number }>(`/governance/audit-log${qs}`)
   },
 
-  // Reports
-  getWeeklyReport: () =>
-    request<import('./types').WeeklyReport>('/reports/weekly'),
-  getTrendData: (params?: Record<string, string>) => {
-    const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-    return request<import('./types').TrendDataPoint[]>(`/reports/trend${qs}`)
+  // Drift Map
+  getDriftHeatmap: (domain = 'enterprise', days = 30) =>
+    request<import('./types').DriftHeatmap>(`/drift-map/heatmap?domain=${domain}&days=${days}`),
+  getDriftTrend: (pattern: string, days = 30, teamId?: string) => {
+    const qs = new URLSearchParams({ days: String(days) })
+    if (teamId) qs.set('team_id', teamId)
+    return request<import('./types').DriftTrend>(`/drift-map/trend/${pattern}?${qs}`)
   },
-  getNISTRiskMatrix: () =>
-    request<Record<string, unknown>>('/reports/nist-risk-matrix'),
-  getBoardSummary: () =>
-    request<Record<string, unknown>>('/reports/board-summary'),
+  getDriftSummary: (domain = 'enterprise') =>
+    request<import('./types').DriftSummary>(`/drift-map/summary?domain=${domain}`),
+
+  // Reports
+  getWeeklyReport: (domain = 'enterprise') =>
+    request<import('./types').WeeklyReportData>(`/reports/weekly-summary?domain=${domain}`),
+  getNISTRisk: (domain = 'enterprise') =>
+    request<import('./types').NISTRiskData>(`/reports/nist-risk?domain=${domain}`),
+  getBoardSummary: (domain = 'enterprise') =>
+    request<import('./types').BoardSummaryData>(`/reports/board-summary?domain=${domain}`),
+  getPatternTrend: (pattern: string, days = 30) =>
+    request<{ pattern: string; days: number; trend: import('./types').TrendDataPoint[] }>(`/reports/trend/${pattern}?days=${days}`),
+
+  // Export
+  exportReport: (format: 'csv' | 'json', reportType: string, domain = 'enterprise') =>
+    request<Blob>(`/reports/export?format=${format}&report_type=${reportType}&domain=${domain}`),
+
+  // Threat Intelligence
+  getThreatFeed: (severity?: string, pattern?: string) => {
+    const qs = new URLSearchParams()
+    if (severity) qs.set('severity', severity)
+    if (pattern) qs.set('pattern', pattern)
+    const q = qs.toString()
+    return request<{ items: import('./types').ThreatIntelItem[]; total: number }>(`/threat-intel/feed${q ? '?' + q : ''}`)
+  },
+  getThreatCorrelations: () =>
+    request<{ correlations: import('./types').ThreatCorrelation[]; total_threats: number; active_correlations: number }>('/threat-intel/correlate'),
+
+  // Scans
+  triggerScan: (domain = 'enterprise', scope = 'full') =>
+    request<{ scan_id: string; status: string; message: string }>('/scans/trigger', {
+      method: 'POST', body: JSON.stringify({ domain, scope }),
+    }),
+  getScanStatus: () =>
+    request<{ active: boolean; scan_id?: string; status?: string; signals_processed?: number; alerts_generated?: number }>('/scans/status'),
+  getScanHistory: (limit = 20) =>
+    request<{ scans: import('./types').ScanRecord[]; total: number }>(`/scans/history?limit=${limit}`),
+  createScanSchedule: (domain: string, scope: string, cron: string) =>
+    request('/scans/schedule', { method: 'POST', body: JSON.stringify({ domain, scope, cron_expression: cron }) }),
+  getScanSchedules: () =>
+    request<{ schedules: import('./types').ScanSchedule[]; total: number }>('/scans/schedules'),
 
   // Onboarding
   getOnboardingStatus: () =>

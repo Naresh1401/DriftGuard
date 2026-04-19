@@ -11,6 +11,8 @@ import Reports from './pages/Reports'
 import Onboarding from './pages/Onboarding'
 import DataCollection from './pages/DataCollection'
 import LiveScanner from './pages/LiveScanner'
+import ThreatIntel from './pages/ThreatIntel'
+import Scans from './pages/Scans'
 
 export default function App() {
   return (
@@ -27,6 +29,8 @@ export default function App() {
           <Route path="/live-scanner" element={<LiveScanner />} />
           <Route path="/governance" element={<Governance />} />
           <Route path="/reports" element={<Reports />} />
+          <Route path="/threat-intel" element={<ThreatIntel />} />
+          <Route path="/scans" element={<Scans />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -50,22 +50,53 @@ const DEMO_AUDIT = [
 export default function Governance() {
   const { can } = useAuth()
   const [actions, setActions] = useState<GovernanceAction[]>(DEMO_ACTIONS)
+  const [auditLog, setAuditLog] = useState<Array<{ timestamp: string; action: string; actor: string | null; details: string | Record<string, unknown> }>>(DEMO_AUDIT)
   const [loading, setLoading] = useState(false)
+  const [acting, setActing] = useState<string | null>(null)
   const [tab, setTab] = useState<'gates' | 'audit'>('gates')
 
+  const loadActions = async () => {
+    setLoading(true)
+    try {
+      const data = await api.getPendingActions()
+      setActions(data)
+    } catch { /* fallback to demo */ }
+    finally { setLoading(false) }
+  }
+
+  const loadAudit = async () => {
+    try {
+      const data = await api.getAuditLog()
+      if (data?.entries?.length) setAuditLog(data.entries)
+    } catch { /* fallback */ }
+  }
+
   useEffect(() => {
-    let cancelled = false
-    async function load() {
-      setLoading(true)
-      try {
-        const data = await api.getPendingActions()
-        if (!cancelled) setActions(data)
-      } catch { /* demo */ }
-      finally { if (!cancelled) setLoading(false) }
-    }
-    load()
-    return () => { cancelled = true }
+    loadActions()
+    loadAudit()
   }, [])
+
+  const handleApprove = async (action: GovernanceAction) => {
+    setActing(action.action_id)
+    try {
+      await api.approveGovernanceAction(action.gate_type, action.action_id)
+      setActions(prev => prev.map(a => a.action_id === action.action_id
+        ? { ...a, status: 'approved', reviewed_at: new Date().toISOString(), reviewer: 'Current User' } : a))
+      loadAudit()
+    } catch { /* keep current state */ }
+    finally { setActing(null) }
+  }
+
+  const handleReject = async (action: GovernanceAction) => {
+    setActing(action.action_id)
+    try {
+      await api.rejectGovernanceAction(action.gate_type, action.action_id)
+      setActions(prev => prev.map(a => a.action_id === action.action_id
+        ? { ...a, status: 'rejected', reviewed_at: new Date().toISOString(), reviewer: 'Current User' } : a))
+      loadAudit()
+    } catch { /* keep current state */ }
+    finally { setActing(null) }
+  }
 
   if (!can('view_governance')) {
     return (
@@ -144,10 +175,12 @@ export default function Governance() {
                 </div>
                 {action.status === 'pending' && can('approve_governance') && (
                   <div className="mt-3 flex gap-2">
-                    <button className="btn-primary text-xs flex items-center gap-1">
-                      <CheckCircle size={14} /> Approve
+                    <button onClick={() => handleApprove(action)} disabled={acting === action.action_id}
+                      className="btn-primary text-xs flex items-center gap-1">
+                      <CheckCircle size={14} /> {acting === action.action_id ? 'Processing…' : 'Approve'}
                     </button>
-                    <button className="btn-secondary text-xs flex items-center gap-1 text-red-600">
+                    <button onClick={() => handleReject(action)} disabled={acting === action.action_id}
+                      className="btn-secondary text-xs flex items-center gap-1 text-red-600">
                       <XCircle size={14} /> Reject
                     </button>
                   </div>
@@ -162,14 +195,14 @@ export default function Governance() {
             Immutable Audit Log
           </div>
           <div className="divide-y divide-gray-100">
-            {DEMO_AUDIT.map((entry, i) => (
+            {auditLog.map((entry, i) => (
               <div key={i} className="py-3 flex items-start gap-4">
                 <div className="text-xs text-gray-400 whitespace-nowrap w-40">
                   {new Date(entry.timestamp).toLocaleString()}
                 </div>
                 <div className="text-xs font-medium text-gray-700 w-32">{entry.action}</div>
                 <div className="text-xs text-gray-500 w-20">{entry.actor}</div>
-                <div className="text-xs text-gray-600 flex-1">{entry.details}</div>
+                <div className="text-xs text-gray-600 flex-1">{typeof entry.details === 'string' ? entry.details : JSON.stringify(entry.details)}</div>
               </div>
             ))}
           </div>

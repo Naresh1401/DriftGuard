@@ -1,10 +1,12 @@
 """Reports API — trend analysis, PDF export, board-ready summaries."""
 from __future__ import annotations
 
+import csv
+import io
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from api.middleware.auth import get_current_user
 from models import DriftPatternType, User
@@ -146,3 +148,74 @@ async def board_ready_summary(
             else "CRITICAL: Significant drift across multiple teams. Immediate governance intervention required."
         ),
     }
+
+
+@router.get("/export")
+async def export_report(
+    report_type: str = Query("weekly", description="Report type: weekly, nist, board"),
+    format: str = Query("csv", description="Export format: csv or json"),
+    domain: str = "enterprise",
+    user: User = Depends(get_current_user),
+):
+    """Export report data as CSV or JSON download."""
+    from main import app_state
+
+    all_alerts = []
+    for scope_alerts in app_state.early_warning._active_alerts.values():
+        all_alerts.extend(a for a in scope_alerts if a.domain == domain)
+
+    if report_type == "weekly":
+        health_score = app_state.early_warning.get_org_health_score(domain)
+        pattern_counts = {}
+        for a in all_alerts:
+            for p in a.drift_patterns:
+                pattern_counts[p.pattern.value] = pattern_counts.get(p.pattern.value, 0) + 1
+
+        data = {
+            "health_score": round(health_score, 1),
+            "total_alerts": len(all_alerts),
+            "critical": sum(1 for a in all_alerts if a.alert_level.value == "Critical"),
+            "warning": sum(1 for a in all_alerts if a.alert_level.value == "Warning"),
+            "watch": sum(1 for a in all_alerts if a.alert_level.value == "Watch"),
+            **{f"pattern_{k}": v for k, v in pattern_counts.items()},
+        }
+
+        if format == "csv":
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(["Metric", "Value"])
+            for k, v in data.items():
+                writer.writerow([k.replace("_", " ").title(), v])
+            output.seek(0)
+            return StreamingResponse(
+                iter([output.getvalue()]),
+                media_type="text/csv",
+                headers={"Content-Disposition": f"attachment; filename=weekly_report_{domain}.csv"},
+            )
+        return JSONResponse(content=data)
+
+    elif report_type == "nist":
+        control_risk = {}
+        for a in all_alerts:
+            for c in a.nist_controls_at_risk:
+                key = c.value
+                if key not in control_risk:
+                    control_risk[key] = {"control": key, "alert_count": 0, "max_severity": 0}
+                control_risk[key]["alert_count"] += 1
+                control_risk[key]["max_severity"] = max(control_risk[key]["max_severity"], a.severity_score.value)
+
+        if format == "csv":
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(["NIST Control", "Alert Count", "Max Severity"])
+            for v in control_risk.values():
+                writer.writerow([v["control"], v["alert_count"], v["max_severity"]])
+            output.seek(0)
+            return StreamingResponse(
+                iter([output.getvalue()]),
+                media_type="text/csv",
+                headers={"Content-Disposition": f"attachment; filename=nist_risk_{domain}.csv"},
+            )
+        return JSONResponse(content={"controls": list(control_risk.values())})
+
+    return JSONResponse(content={"error": f"Unknown report type: {report_type}"}, status_code=400)

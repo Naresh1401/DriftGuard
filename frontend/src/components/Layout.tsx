@@ -11,6 +11,8 @@ import {
   ChevronDown,
   DatabaseZap,
   Radar,
+  ShieldAlert,
+  ScanSearch,
 } from 'lucide-react'
 import { useState } from 'react'
 import clsx from 'clsx'
@@ -29,6 +31,8 @@ const NAV_ITEMS = [
   { to: '/live-scanner', label: 'Live Scanner', icon: Radar },
   { to: '/governance', label: 'Governance', icon: Shield },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
+  { to: '/threat-intel', label: 'Threat Intel', icon: ShieldAlert },
+  { to: '/scans', label: 'Scans', icon: ScanSearch },
 ]
 
 const ROLE_LABELS: Record<UserRole, string> = {

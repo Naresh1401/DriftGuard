@@ -42,6 +42,7 @@ class AppState:
             AuditLogger,
         )
         from integrations.app_adapter import UniversalAppRegistry
+        from db.persistence import PersistenceService
 
         # Core pipeline
         self.pipeline = DriftGuardPipeline(
@@ -50,6 +51,9 @@ class AppState:
 
         # Early warning engine
         self.early_warning = EarlyWarningEngine()
+
+        # Database persistence
+        self.persistence = PersistenceService()
 
         # NI Calibration
         self.content_api = NI_ContentAPI(
@@ -157,6 +161,9 @@ from api.routes.reports import router as reports_router
 from api.routes.onboarding import router as onboarding_router
 from api.routes.integrations import router as integrations_router
 from api.routes.scanner import router as scanner_router
+from api.routes.drift_map import router as drift_map_router
+from api.routes.threat_intel import router as threat_intel_router
+from api.routes.scans import router as scans_router
 
 app.include_router(health_router, prefix=settings.api_prefix)
 app.include_router(signals_router, prefix=settings.api_prefix)
@@ -168,6 +175,9 @@ app.include_router(reports_router, prefix=settings.api_prefix)
 app.include_router(onboarding_router, prefix=settings.api_prefix)
 app.include_router(integrations_router, prefix=settings.api_prefix)
 app.include_router(scanner_router, prefix=settings.api_prefix)
+app.include_router(drift_map_router, prefix=settings.api_prefix)
+app.include_router(threat_intel_router, prefix=settings.api_prefix)
+app.include_router(scans_router, prefix=settings.api_prefix)
 
 
 @app.get("/")

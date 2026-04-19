@@ -18,6 +18,8 @@ export type Permission =
   | 'view_reports_nist'
   | 'view_reports_board'
   | 'view_nist_detail'
+  | 'view_threat_intel'
+  | 'trigger_scan'
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   admin: [
@@ -25,29 +27,34 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'view_drift_map', 'view_calibration', 'approve_calibration',
     'view_domains', 'manage_domains', 'view_governance', 'approve_governance',
     'view_reports_weekly', 'view_reports_nist', 'view_reports_board', 'view_nist_detail',
+    'view_threat_intel', 'trigger_scan',
   ],
   ciso: [
     'view_dashboard', 'view_alerts', 'acknowledge_alert', 'resolve_alert',
     'view_drift_map', 'view_calibration',
     'view_domains', 'view_governance', 'approve_governance',
     'view_reports_weekly', 'view_reports_nist', 'view_reports_board', 'view_nist_detail',
+    'view_threat_intel', 'trigger_scan',
   ],
   ni_architect: [
     'view_dashboard', 'view_alerts',
     'view_drift_map', 'view_calibration', 'approve_calibration',
     'view_governance', 'approve_governance',
     'view_reports_weekly', 'view_reports_nist',
+    'view_threat_intel', 'trigger_scan',
   ],
   compliance_officer: [
     'view_dashboard', 'view_alerts', 'acknowledge_alert', 'resolve_alert',
     'view_drift_map', 'view_calibration',
     'view_governance',
     'view_reports_weekly', 'view_reports_nist',
+    'view_threat_intel',
   ],
   viewer: [
     'view_dashboard', 'view_alerts',
     'view_drift_map',
     'view_reports_weekly',
+    'view_threat_intel',
   ],
 }
 
@@ -62,6 +69,8 @@ export const NAV_ACCESS: Record<string, UserRole[]> = {
   '/live-scanner': ['admin', 'ciso', 'ni_architect', 'compliance_officer'],
   '/governance':   ['admin', 'ciso', 'ni_architect', 'compliance_officer'],
   '/reports':      ['admin', 'ciso', 'ni_architect', 'compliance_officer'],
+  '/threat-intel': ['admin', 'ciso', 'ni_architect', 'compliance_officer', 'viewer'],
+  '/scans':        ['admin', 'ciso', 'ni_architect'],
 }
 
 /* ── Context ─────────────────────────────────────────── */
