@@ -67,6 +67,49 @@ async def active_alert_counts(user: User = Depends(get_current_user)):
     return counts
 
 
+@router.get("/health-score/{domain}")
+async def get_health_score(
+    domain: str,
+    user: User = Depends(get_current_user),
+):
+    """Get organization drift health score (0-100)."""
+    from main import app_state
+
+    score = app_state.early_warning.get_org_health_score(domain)
+
+    # Gather active alerts for breakdown
+    all_alerts = []
+    for scope_alerts in app_state.early_warning._active_alerts.values():
+        all_alerts.extend(
+            a for a in scope_alerts
+            if a.status == AlertStatus.ACTIVE and a.domain == domain
+        )
+
+    critical = sum(1 for a in all_alerts if a.alert_level == AlertLevel.CRITICAL)
+    warning = sum(1 for a in all_alerts if a.alert_level == AlertLevel.WARNING)
+    watch = sum(1 for a in all_alerts if a.alert_level == AlertLevel.WATCH)
+    patterns = len({p.pattern for a in all_alerts for p in a.drift_patterns})
+
+    # Determine trend based on recent alert count
+    if critical > 0:
+        trend = "declining"
+    elif warning > 1:
+        trend = "declining"
+    elif len(all_alerts) == 0:
+        trend = "stable"
+    else:
+        trend = "stable"
+
+    return {
+        "score": round(score, 1),
+        "trend": trend,
+        "active_patterns": patterns,
+        "critical_alerts": critical,
+        "warning_alerts": warning,
+        "watch_alerts": watch,
+    }
+
+
 @router.get("/{alert_id}")
 async def get_alert(alert_id: str, user: User = Depends(get_current_user)):
     """Get a specific alert with full details."""
@@ -179,46 +222,3 @@ async def alert_action(
         raise HTTPException(status_code=404, detail="Alert not found")
 
     raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
-
-
-@router.get("/health-score/{domain}")
-async def get_health_score(
-    domain: str,
-    user: User = Depends(get_current_user),
-):
-    """Get organization drift health score (0-100)."""
-    from main import app_state
-
-    score = app_state.early_warning.get_org_health_score(domain)
-
-    # Gather active alerts for breakdown
-    all_alerts = []
-    for scope_alerts in app_state.early_warning._active_alerts.values():
-        all_alerts.extend(
-            a for a in scope_alerts
-            if a.status == AlertStatus.ACTIVE and a.domain == domain
-        )
-
-    critical = sum(1 for a in all_alerts if a.alert_level == AlertLevel.CRITICAL)
-    warning = sum(1 for a in all_alerts if a.alert_level == AlertLevel.WARNING)
-    watch = sum(1 for a in all_alerts if a.alert_level == AlertLevel.WATCH)
-    patterns = len({p.pattern for a in all_alerts for p in a.drift_patterns})
-
-    # Determine trend based on recent alert count
-    if critical > 0:
-        trend = "declining"
-    elif warning > 1:
-        trend = "declining"
-    elif len(all_alerts) == 0:
-        trend = "stable"
-    else:
-        trend = "stable"
-
-    return {
-        "score": round(score, 1),
-        "trend": trend,
-        "active_patterns": patterns,
-        "critical_alerts": critical,
-        "warning_alerts": warning,
-        "watch_alerts": watch,
-    }
