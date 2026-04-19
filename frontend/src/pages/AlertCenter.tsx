@@ -43,17 +43,19 @@ export default function AlertCenter() {
   const { role, can } = useAuth()
   const [alerts, setAlerts] = useState<Alert[]>(DEMO_ALERTS)
   const [filter, setFilter] = useState<AlertLevel | 'all'>('all')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       setLoading(true)
+      setError(null)
       try {
         const data = await api.getAlerts({ limit: '50' })
         if (!cancelled) setAlerts(data.alerts)
       } catch {
-        // demo data
+        if (!cancelled) setError('Failed to load alerts. Showing demo data.')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -84,6 +86,11 @@ export default function AlertCenter() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 flex items-center gap-2">
+          <Filter size={16} className="shrink-0" /> {error}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Alert Center</h1>

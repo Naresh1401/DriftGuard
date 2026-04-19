@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -17,6 +17,23 @@ router = APIRouter(prefix="/scans", tags=["Scans"])
 _scan_history: list[dict] = []
 _scheduled_scans: list[dict] = []
 _active_scan: Optional[dict] = None
+
+
+def _compute_next_run(cron_expr: str) -> str:
+    """Compute approximate next run from a simple cron expression (minute hour day month weekday)."""
+    try:
+        parts = cron_expr.strip().split()
+        if len(parts) != 5:
+            return (datetime.utcnow().replace(hour=2, minute=0, second=0) + timedelta(days=1)).isoformat()
+        minute = int(parts[0]) if parts[0] != '*' else 0
+        hour = int(parts[1]) if parts[1] != '*' else 2
+        now = datetime.utcnow()
+        next_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if next_time <= now:
+            next_time += timedelta(days=1)
+        return next_time.isoformat()
+    except (ValueError, IndexError):
+        return (datetime.utcnow() + timedelta(days=1)).isoformat()
 
 
 class ScanRequest(BaseModel):
@@ -55,7 +72,7 @@ async def trigger_scan(
         "completed_at": None,
         "signals_processed": 0,
         "alerts_generated": 0,
-        "triggered_by": user.username,
+        "triggered_by": user.email,
     }
     _active_scan = scan
 
@@ -65,37 +82,48 @@ async def trigger_scan(
 
 
 async def _execute_scan(scan: dict, app_state) -> None:
-    """Execute the scan in background — processes pending signals."""
+    """Execute the scan in background — processes pending signals through the full pipeline."""
     global _active_scan
     try:
         pipeline = app_state.pipeline
         early_warning = app_state.early_warning
 
-        # Process any buffered signals through the pipeline
-        processed = 0
-        alerts = 0
-
-        # Run a classification cycle
-        from pipeline.signal_ingestion import SignalBuffer
-        buffer = getattr(pipeline, '_signal_buffer', SignalBuffer())
-        pending = buffer.flush()
-        processed = len(pending)
-
-        for signal in pending:
-            result = pipeline.classify(signal)
-            if result and result.get("severity", 0) >= 3:
-                alerts += 1
-
-        # Get current alert counts to determine generated alerts
+        # Flush any buffered signals from the ingestion engine
+        buffered = pipeline._ingestion.flush_buffer()
+        processed = len(buffered)
+        alerts_before = 0
         for scope_alerts in early_warning._active_alerts.values():
-            for a in scope_alerts:
-                if a.domain == scan["domain"]:
-                    alerts += 1
+            alerts_before += sum(1 for a in scope_alerts if a.domain == scan["domain"])
+
+        # If we have buffered signals, run them through the full pipeline
+        if buffered:
+            from models import RawSignal, SignalType
+            # Re-wrap as raw signals for pipeline.process()
+            raw_signals = []
+            for ps in buffered:
+                raw = RawSignal(
+                    id=ps.raw_signal_id,
+                    signal_type=ps.signal_type,
+                    source=scan["domain"],
+                    data=ps.features,
+                    timestamp=ps.timestamp,
+                )
+                raw_signals.append(raw)
+            report = await pipeline.process(
+                raw_signals,
+                domain=scan["domain"],
+            )
+            processed = len(raw_signals)
+
+        # Count new alerts generated during scan
+        alerts_after = 0
+        for scope_alerts in early_warning._active_alerts.values():
+            alerts_after += sum(1 for a in scope_alerts if a.domain == scan["domain"])
 
         scan["status"] = "completed"
         scan["completed_at"] = datetime.utcnow().isoformat()
         scan["signals_processed"] = processed
-        scan["alerts_generated"] = alerts
+        scan["alerts_generated"] = max(0, alerts_after - alerts_before)
 
     except Exception as e:
         scan["status"] = "failed"
@@ -130,6 +158,10 @@ async def create_schedule(
 ):
     """Create or update a scan schedule."""
     schedule_id = str(uuid.uuid4())[:8]
+
+    # Compute next_run from cron expression
+    next_run = _compute_next_run(req.cron_expression)
+
     schedule = {
         "schedule_id": schedule_id,
         "domain": req.domain,
@@ -137,9 +169,9 @@ async def create_schedule(
         "cron_expression": req.cron_expression,
         "enabled": req.enabled,
         "created_at": datetime.utcnow().isoformat(),
-        "created_by": user.username,
+        "created_by": user.email,
         "last_run": None,
-        "next_run": None,
+        "next_run": next_run,
     }
     _scheduled_scans.append(schedule)
     return {"schedule_id": schedule_id, "status": "created", "schedule": schedule}

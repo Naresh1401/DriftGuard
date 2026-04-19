@@ -51,16 +51,18 @@ export default function Governance() {
   const { can } = useAuth()
   const [actions, setActions] = useState<GovernanceAction[]>(DEMO_ACTIONS)
   const [auditLog, setAuditLog] = useState<Array<{ timestamp: string; action: string; actor: string | null; details: string | Record<string, unknown> }>>(DEMO_AUDIT)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState<string | null>(null)
   const [tab, setTab] = useState<'gates' | 'audit'>('gates')
+  const [error, setError] = useState<string | null>(null)
 
   const loadActions = async () => {
     setLoading(true)
+    setError(null)
     try {
       const data = await api.getPendingActions()
       setActions(data)
-    } catch { /* fallback to demo */ }
+    } catch { setError('Failed to load governance actions.') }
     finally { setLoading(false) }
   }
 
@@ -68,7 +70,7 @@ export default function Governance() {
     try {
       const data = await api.getAuditLog()
       if (data?.entries?.length) setAuditLog(data.entries)
-    } catch { /* fallback */ }
+    } catch { /* audit log non-critical */ }
   }
 
   useEffect(() => {
@@ -112,6 +114,11 @@ export default function Governance() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+          {error}
+        </div>
+      )}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Governance</h1>
         <p className="text-sm text-gray-500 mt-1">

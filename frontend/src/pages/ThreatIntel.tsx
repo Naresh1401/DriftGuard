@@ -19,9 +19,11 @@ export default function ThreatIntel() {
   const [sevFilter, setSevFilter] = useState<string>('')
   const [tab, setTab] = useState<'feed' | 'correlations'>('feed')
   const [activeCorrelations, setActiveCorrelations] = useState(0)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let c = false
+    setError(null)
     Promise.all([
       api.getThreatFeed(sevFilter || undefined),
       api.getThreatCorrelations(),
@@ -30,7 +32,7 @@ export default function ThreatIntel() {
       setFeed(feedRes.items)
       setCorrelations(corrRes.correlations)
       setActiveCorrelations(corrRes.active_correlations)
-    }).catch(() => {}).finally(() => { if (!c) setLoading(false) })
+    }).catch(() => { if (!c) setError('Failed to load threat intelligence feed.') }).finally(() => { if (!c) setLoading(false) })
     return () => { c = true }
   }, [sevFilter])
 
@@ -38,6 +40,11 @@ export default function ThreatIntel() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 flex items-center gap-2">
+          <AlertTriangle size={16} className="shrink-0" /> {error}
+        </div>
+      )}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Threat Intelligence</h1>
         <p className="text-sm text-gray-500 mt-1">

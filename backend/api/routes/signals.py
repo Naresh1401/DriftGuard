@@ -429,7 +429,45 @@ async def collect_from_siem(
     if not input.connection or not input.connection.get("host", input.connection.get("workspace_id", "")):
         return _demo_siem_response(siem, input.query, input.time_range)
 
-    # Real SIEM connection would go here using the integration connectors
+    # Attempt real SIEM connection using integration connectors
+    try:
+        from integrations.base import ConnectorConfig
+        from integrations.splunk import SplunkConnector
+        from integrations.sentinel import SentinelConnector
+        from integrations.cloudtrail import CloudTrailConnector
+
+        connector_map = {
+            "splunk": SplunkConnector,
+            "sentinel": SentinelConnector,
+            "cloudtrail": CloudTrailConnector,
+        }
+        connector_cls = connector_map[siem]
+        config = ConnectorConfig(
+            connector_type=siem,
+            base_url=input.connection.get("host", input.connection.get("base_url", "")),
+            auth_token=input.connection.get("token", input.connection.get("auth_token", "")),
+            username=input.connection.get("username", ""),
+            password=input.connection.get("password", ""),
+            custom_params=input.connection,
+        )
+        connector = connector_cls(config)
+        connected = await connector.connect()
+        if connected:
+            raw_signals = await connector.poll()
+            await connector.disconnect()
+            return {
+                "siem": siem,
+                "query": input.query,
+                "time_range": input.time_range,
+                "events": [{"signal_type": str(s.signal_type), "data": s.data} for s in raw_signals[:50]],
+                "total_events": len(raw_signals),
+                "signals_ingested": len(raw_signals),
+                "mode": "live",
+            }
+    except Exception as e:
+        logger.warning(f"Real SIEM connection failed for {siem}, falling back to demo: {e}")
+
+    # Fallback to demo data if real connection fails
     return _demo_siem_response(siem, input.query, input.time_range)
 
 

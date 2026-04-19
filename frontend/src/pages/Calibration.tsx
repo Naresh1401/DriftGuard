@@ -48,18 +48,20 @@ const DEMO_RESPONSES: CalibrationResponse[] = [
 export default function Calibration() {
   const { can } = useAuth()
   const [responses, setResponses] = useState<CalibrationResponse[]>(DEMO_RESPONSES)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       setLoading(true)
+      setError(null)
       try {
         const data = await api.getCalibrationResponses()
         if (!cancelled) setResponses(data)
       } catch {
-        // demo data
+        if (!cancelled) setError('Failed to load calibration responses. Showing demo data.')
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -98,6 +100,11 @@ export default function Calibration() {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+          {error}
+        </div>
+      )}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">NI Calibration</h1>
         <p className="text-sm text-gray-500 mt-1">
