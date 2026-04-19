@@ -178,3 +178,72 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+async def seed_default_accounts() -> int:
+    """Create default test/demo accounts if they don't already exist.
+
+    Returns number of accounts created.
+    """
+    from passlib.context import CryptContext
+
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+    default_accounts = [
+        {
+            "email": "admin@driftguard.com",
+            "full_name": "Admin User",
+            "role": "admin",
+            "organization": "DriftGuard",
+        },
+        {
+            "email": "ciso@driftguard.com",
+            "full_name": "CISO User",
+            "role": "ciso",
+            "organization": "DriftGuard",
+        },
+        {
+            "email": "compliance_officer@driftguard.com",
+            "full_name": "Compliance Officer",
+            "role": "compliance_officer",
+            "organization": "DriftGuard",
+        },
+        {
+            "email": "ni_architect@driftguard.com",
+            "full_name": "NI Architect",
+            "role": "ni_architect",
+            "organization": "DriftGuard",
+        },
+        {
+            "email": "viewer@driftguard.com",
+            "full_name": "Viewer User",
+            "role": "viewer",
+            "organization": "DriftGuard",
+        },
+    ]
+
+    hashed_pw = pwd_context.hash("Test1234!")
+    created = 0
+
+    async with async_session() as session:
+        from sqlalchemy import select as sa_select
+
+        for acct in default_accounts:
+            result = await session.execute(
+                sa_select(UserRecord).where(UserRecord.email == acct["email"])
+            )
+            if result.scalar_one_or_none() is None:
+                user = UserRecord(
+                    email=acct["email"],
+                    full_name=acct["full_name"],
+                    hashed_password=hashed_pw,
+                    role=acct["role"],
+                    organization=acct["organization"],
+                    is_active=True,
+                )
+                session.add(user)
+                created += 1
+
+        await session.commit()
+
+    return created

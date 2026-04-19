@@ -110,9 +110,16 @@ async def lifespan(app: FastAPI):
         logger.info(f"Loaded {app_count} universal app configurations")
 
     # Initialize database
-    from db.database import init_db
+    from db.database import init_db, seed_default_accounts
     await init_db()
     logger.info("Database initialized")
+
+    # Seed default demo accounts (idempotent — skips existing)
+    seeded = await seed_default_accounts()
+    if seeded:
+        logger.info(f"Seeded {seeded} default demo accounts")
+    else:
+        logger.info("Default demo accounts already exist")
 
     logger.info("DriftGuard is ready.")
     logger.info(f"Ethical banner: {ETHICAL_BANNER}")
