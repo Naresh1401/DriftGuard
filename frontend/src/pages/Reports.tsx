@@ -240,7 +240,7 @@ function BoardSummary() {
           <Stat label="Active Critical" value={es.active_critical} color="text-red-600" />
           <Stat label="Active Warnings" value={es.active_warnings} color="text-orange-600" />
         </div>
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
           <Stat label="Calibrations Delivered" value={es.calibration_responses_delivered} />
           <Stat label="Calibrations Acted Upon" value={es.calibration_acted_upon} />
         </div>

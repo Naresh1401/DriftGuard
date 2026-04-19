@@ -113,7 +113,7 @@ export default function Calibration() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="Total Responses" value={responses.length} icon={<BookOpen size={18} />} />
         <StatCard
           label="Pending Approval"

@@ -69,7 +69,7 @@ export default function LiveScanner() {
 
       {/* Input bar */}
       <div className="card border border-gray-200">
-        <div className="flex gap-3 items-end">
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
           <div className="flex-1">
             <label className="text-xs text-gray-500 block mb-1">Target URL</label>
             <input
@@ -82,7 +82,7 @@ export default function LiveScanner() {
               disabled={loading}
             />
           </div>
-          <div className="flex items-center gap-4 pb-0.5">
+          <div className="flex flex-wrap items-center gap-4 pb-0.5">
             <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
               <input type="checkbox" checked={scanPorts} onChange={e => setScanPorts(e.target.checked)} className="rounded" disabled={loading} />
               Port Scan
@@ -241,7 +241,7 @@ function SSLSection({ ssl }: { ssl: LiveScanResult['ssl'] }) {
       {ssl.error ? (
         <p className="text-sm text-red-600">{ssl.error}</p>
       ) : (
-        <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
           <Row label="Protocol" value={ssl.protocol || '—'} />
           <Row label="Cipher" value={ssl.cipher ? `${ssl.cipher} (${ssl.cipher_bits}‑bit)` : '—'} />
           <Row label="Issuer" value={`${ssl.issuer_org} (${ssl.issuer_cn})`} />

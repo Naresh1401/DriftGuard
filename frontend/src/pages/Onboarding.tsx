@@ -130,7 +130,7 @@ export default function Onboarding() {
           </div>
 
           {step === 0 && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {DOMAINS.map((d) => (
                 <button
                   key={d.id}

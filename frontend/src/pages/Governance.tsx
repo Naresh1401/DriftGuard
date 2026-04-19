@@ -203,12 +203,14 @@ export default function Governance() {
           </div>
           <div className="divide-y divide-gray-100">
             {auditLog.map((entry, i) => (
-              <div key={i} className="py-3 flex items-start gap-4">
-                <div className="text-xs text-gray-400 whitespace-nowrap w-40">
+              <div key={i} className="py-3 flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
+                <div className="text-xs text-gray-400 whitespace-nowrap sm:w-40">
                   {new Date(entry.timestamp).toLocaleString()}
                 </div>
-                <div className="text-xs font-medium text-gray-700 w-32">{entry.action}</div>
-                <div className="text-xs text-gray-500 w-20">{entry.actor}</div>
+                <div className="flex items-center gap-2 sm:contents">
+                  <div className="text-xs font-medium text-gray-700 sm:w-32">{entry.action}</div>
+                  <div className="text-xs text-gray-500 sm:w-20">{entry.actor}</div>
+                </div>
                 <div className="text-xs text-gray-600 flex-1">{typeof entry.details === 'string' ? entry.details : JSON.stringify(entry.details)}</div>
               </div>
             ))}

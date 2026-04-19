@@ -239,7 +239,7 @@ function AdminDashboard({ health, alerts, weeklyData }: { health: HealthScore; a
   return (
     <>
       {/* System KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <KPICard icon={<Activity size={20} />} label="Health Score" value={health.score} suffix="/100"
           color={health.score >= 70 ? 'text-green-600' : 'text-red-600'} trend={health.trend} />
         <KPICard icon={<AlertTriangle size={20} />} label="Critical" value={health.critical_alerts} color="text-red-600" />
@@ -325,7 +325,7 @@ function AdminDashboard({ health, alerts, weeklyData }: { health: HealthScore; a
         <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
           <Shield size={16} className="text-yellow-500" /> Pending Governance Actions
         </h3>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <MiniStat label="NI Response Approvals" value={2} icon={<BookOpen size={16} />} color="text-purple-600" />
           <MiniStat label="NIST Validations" value={1} icon={<Shield size={16} />} color="text-blue-600" />
           <MiniStat label="Critical Alert Reviews" value={1} icon={<AlertTriangle size={16} />} color="text-red-600" />
@@ -349,7 +349,7 @@ function CISODashboard({ health, alerts, nistData }: { health: HealthScore; aler
   return (
     <>
       {/* Risk KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPICard icon={<Activity size={20} />} label="Risk Score" value={100 - health.score} suffix="/100"
           color={health.score >= 70 ? 'text-green-600' : 'text-red-600'} />
         <KPICard icon={<AlertTriangle size={20} />} label="Critical Alerts" value={health.critical_alerts} color="text-red-600" />
@@ -474,7 +474,7 @@ function NIArchitectDashboard({ health, alerts }: { health: HealthScore; alerts:
   return (
     <>
       {/* Calibration KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPICard icon={<BookOpen size={20} />} label="Total Responses" value={calData.total || 18} color="text-indigo-600" />
         <KPICard icon={<Clock size={20} />} label="Pending Approval" value={calData.pending} color="text-yellow-600" />
         <KPICard icon={<CheckCircle size={20} />} label="Approved" value={calData.approved || 14} color="text-green-600" />
@@ -486,7 +486,7 @@ function NIArchitectDashboard({ health, alerts }: { health: HealthScore; alerts:
         <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
           <BookOpen size={16} className="text-indigo-500" /> NI Response Pipeline
         </h3>
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {([
             { stage: 'Draft', count: 2, color: 'bg-gray-100 text-gray-700 border-gray-200' },
             { stage: 'Pending', count: 2, color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
@@ -553,7 +553,7 @@ function ComplianceOfficerDashboard({ health, alerts, weeklyData }: { health: He
   return (
     <>
       {/* Compliance-focused KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KPICard icon={<Activity size={20} />} label="Health Score" value={health.score} suffix="/100"
           trend={health.trend}
           color={health.score >= 70 ? 'text-green-600' : health.score >= 50 ? 'text-yellow-600' : 'text-red-600'} />
@@ -597,7 +597,7 @@ function ComplianceOfficerDashboard({ health, alerts, weeklyData }: { health: He
             { framework: 'ISO 27001', coverage: 78, status: 'attention' },
           ]).map((f) => (
             <div key={f.framework} className="flex items-center gap-4">
-              <span className="text-sm text-gray-700 w-44">{f.framework}</span>
+              <span className="text-sm text-gray-700 w-28 sm:w-44 shrink-0">{f.framework}</span>
               <div className="flex-1 bg-gray-100 rounded-full h-2.5">
                 <div
                   className={clsx('h-2.5 rounded-full', f.coverage >= 90 ? 'bg-green-500' : f.coverage >= 80 ? 'bg-yellow-400' : 'bg-orange-500')}
@@ -631,7 +631,7 @@ function ViewerDashboard({ health, alerts }: { health: HealthScore; alerts: Aler
   return (
     <>
       {/* Simplified KPIs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <KPICard icon={<Activity size={20} />} label="Health Score" value={health.score} suffix="/100"
           trend={health.trend}
           color={health.score >= 70 ? 'text-green-600' : health.score >= 50 ? 'text-yellow-600' : 'text-red-600'} />

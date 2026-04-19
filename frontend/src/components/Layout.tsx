@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Outlet, NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth, NAV_ACCESS } from '../auth'
 import {
@@ -13,6 +14,8 @@ import {
   ShieldAlert,
   ScanSearch,
   LogOut,
+  Menu,
+  X,
 } from 'lucide-react'
 import clsx from 'clsx'
 import type { UserRole } from '../types'
@@ -62,6 +65,7 @@ export default function Layout() {
   const { role, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Route guard: redirect to dashboard if user navigates to a restricted page
   const currentPath = location.pathname
@@ -75,6 +79,67 @@ export default function Layout() {
     return !roles || roles.includes(role)
   })
 
+  const sidebarContent = (
+    <>
+      <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-drift-800 tracking-tight">
+            DriftGuard
+          </h1>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Human-State Drift Detection
+          </p>
+        </div>
+        <button
+          onClick={() => setSidebarOpen(false)}
+          className="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
+          aria-label="Close sidebar"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      <nav className="flex-1 py-4 space-y-0.5 px-3 overflow-y-auto">
+        {visibleNav.map(({ to, label, icon: Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            onClick={() => setSidebarOpen(false)}
+            className={({ isActive }) =>
+              clsx(
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-drift-50 text-drift-800'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              )
+            }
+          >
+            <Icon size={18} />
+            {label}
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* User info & logout */}
+      <div className="p-4 border-t border-gray-100">
+        <div className="mb-3">
+          <span className={clsx('inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border', ROLE_COLORS[role])}>
+            {ROLE_LABELS[role]}
+          </span>
+          <p className="text-xs text-gray-400 mt-1">{ROLE_DESCRIPTIONS[role]}</p>
+        </div>
+        <button
+          onClick={() => { logout(); navigate('/login') }}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gray-50 text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+        >
+          <LogOut size={16} />
+          <span>Sign Out</span>
+        </button>
+      </div>
+    </>
+  )
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Ethical banner — permanent, non-dismissible */}
@@ -82,60 +147,42 @@ export default function Layout() {
         {ETHICAL_BANNER}
       </div>
 
+      {/* Mobile header with hamburger */}
+      <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
+        <div>
+          <h1 className="text-lg font-bold text-drift-800">DriftGuard</h1>
+        </div>
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+          aria-label="Open menu"
+        >
+          <Menu size={22} />
+        </button>
+      </div>
+
       <div className="flex flex-1">
-        {/* Sidebar */}
-        <aside className="w-64 bg-white border-r border-gray-200 flex flex-col">
-          <div className="p-6 border-b border-gray-100">
-            <h1 className="text-xl font-bold text-drift-800 tracking-tight">
-              DriftGuard
-            </h1>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Human-State Drift Detection
-            </p>
-          </div>
+        {/* Mobile sidebar overlay */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
-          <nav className="flex-1 py-4 space-y-0.5 px-3">
-            {visibleNav.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={to === '/'}
-                className={({ isActive }) =>
-                  clsx(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-drift-50 text-drift-800'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  )
-                }
-              >
-                <Icon size={18} />
-                {label}
-              </NavLink>
-            ))}
-          </nav>
-
-          {/* User info & logout */}
-          <div className="p-4 border-t border-gray-100">
-            <div className="mb-3">
-              <span className={clsx('inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border', ROLE_COLORS[role])}>
-                {ROLE_LABELS[role]}
-              </span>
-              <p className="text-xs text-gray-400 mt-1">{ROLE_DESCRIPTIONS[role]}</p>
-            </div>
-            <button
-              onClick={() => { logout(); navigate('/login') }}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gray-50 text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
-            >
-              <LogOut size={16} />
-              <span>Sign Out</span>
-            </button>
-          </div>
+        {/* Sidebar — hidden on mobile, visible on lg+ */}
+        <aside
+          className={clsx(
+            'fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-200 flex flex-col transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 lg:w-64 lg:z-auto',
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          )}
+        >
+          {sidebarContent}
         </aside>
 
         {/* Main content */}
-        <main className="flex-1 overflow-auto">
-          <div className="max-w-7xl mx-auto p-6">
+        <main className="flex-1 overflow-auto min-w-0">
+          <div className="max-w-7xl mx-auto p-4 sm:p-6">
             <Outlet />
           </div>
         </main>
