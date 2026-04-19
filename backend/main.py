@@ -138,7 +138,9 @@ app = FastAPI(
 
 # CORS — configurable for any application
 _cors_origins = settings.cors_origins.split(",") if hasattr(settings, "cors_origins") and settings.cors_origins else [
-    "http://localhost:5173", "http://localhost:3000",
+    "http://localhost:5173", "http://localhost:3000", "http://localhost:3001",
+    "https://driftguard-eight.vercel.app", "https://driftguard.vercel.app",
+    "https://driftguard-naresh1401.vercel.app", "https://driftguard-api.onrender.com",
 ]
 app.add_middleware(
     CORSMiddleware,
