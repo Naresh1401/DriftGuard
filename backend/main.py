@@ -237,3 +237,27 @@ async def root():
         },
         "docs": "/docs",
     }
+
+
+# ── Serve frontend static files in production ────────
+import os
+
+_frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if _frontend_dist.exists() and os.environ.get("ENVIRONMENT") == "production":
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    # Serve static assets (JS, CSS, images)
+    app.mount("/assets", StaticFiles(directory=str(_frontend_dist / "assets")), name="static-assets")
+
+    # Catch-all: serve index.html for SPA routes
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # If it's a file that exists in dist, serve it
+        file_path = _frontend_dist / full_path
+        if full_path and file_path.exists() and file_path.is_file():
+            return FileResponse(str(file_path))
+        # Otherwise serve index.html for client-side routing
+        return FileResponse(str(_frontend_dist / "index.html"))
+
+    logger.info(f"Serving frontend from {_frontend_dist}")

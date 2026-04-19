@@ -1,10 +1,10 @@
 services:
-  # ─── Backend API ───────────────────────────────────
+  # ─── Full-Stack (Backend API + Frontend SPA) ───────
   - type: web
     name: driftguard-api
     runtime: python
     plan: free
-    buildCommand: cd backend && pip install -r requirements-deploy.txt
+    buildCommand: cd frontend && npm install && npm run build && cd ../backend && pip install -r requirements-deploy.txt
     startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: ENVIRONMENT
@@ -14,21 +14,8 @@ services:
       - key: DATABASE_URL
         value: sqlite+aiosqlite:///./driftguard.db
       - key: CORS_ORIGINS
-        value: https://driftguard.onrender.com,https://driftguard-frontend.onrender.com
+        value: https://driftguard-api-mbdj.onrender.com
       - key: PYTHON_VERSION
         value: 3.11.6
-
-  # ─── Frontend ──────────────────────────────────────
-  - type: web
-    name: driftguard
-    runtime: static
-    buildCommand: cd frontend && npm install && VITE_API_URL=https://driftguard-api.onrender.com npm run build
-    staticPublishPath: frontend/dist
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: public, max-age=0, must-revalidate
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+      - key: NODE_VERSION
+        value: 20.11.0
