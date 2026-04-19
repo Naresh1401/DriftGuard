@@ -42,7 +42,7 @@ class CalibrationRetrieveRequest(BaseModel):
 @router.post("/responses")
 async def add_response(
     input: CalibrationResponseInput,
-    user: User = Depends(require_role(UserRole.FRAMEWORK_TEAM, UserRole.ADMIN)),
+    user: User = Depends(require_role(UserRole.NI_ARCHITECT, UserRole.ADMIN)),
 ):
     """Add a new NI calibration response to the library.
 
@@ -74,7 +74,7 @@ async def add_response(
 @router.post("/responses/{response_id}/approve")
 async def approve_response(
     response_id: str,
-    user: User = Depends(require_role(UserRole.FRAMEWORK_TEAM, UserRole.ADMIN)),
+    user: User = Depends(require_role(UserRole.NI_ARCHITECT, UserRole.ADMIN)),
 ):
     """Framework team approves a calibration response."""
     from main import app_state
@@ -99,7 +99,7 @@ async def approve_response(
 @router.post("/responses/{response_id}/reject")
 async def reject_response(
     response_id: str,
-    user: User = Depends(require_role(UserRole.FRAMEWORK_TEAM, UserRole.ADMIN)),
+    user: User = Depends(require_role(UserRole.NI_ARCHITECT, UserRole.ADMIN)),
 ):
     """Framework team rejects a calibration response."""
     from main import app_state
@@ -149,7 +149,7 @@ async def retrieve_response(
 
 @router.get("/pending-reviews")
 async def get_pending_reviews(
-    user: User = Depends(require_role(UserRole.FRAMEWORK_TEAM, UserRole.ADMIN)),
+    user: User = Depends(require_role(UserRole.NI_ARCHITECT, UserRole.ADMIN)),
 ):
     """Get all calibration responses pending framework team review."""
     from main import app_state
@@ -160,7 +160,7 @@ async def get_pending_reviews(
 @router.get("/effectiveness")
 async def get_effectiveness_report(
     user: User = Depends(require_role(
-        UserRole.FRAMEWORK_TEAM, UserRole.GOVERNANCE_ARCHITECT, UserRole.ADMIN
+        UserRole.NI_ARCHITECT, UserRole.NI_ARCHITECT, UserRole.ADMIN
     )),
 ):
     """Get NI calibration effectiveness report.

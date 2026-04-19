@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
     app_name: str = "DriftGuard"
     app_env: Environment = Environment.DEVELOPMENT
     debug: bool = False
-    secret_key: str = "CHANGE_ME_IN_PRODUCTION"
+    secret_key: str = Field(default_factory=lambda: os.environ.get("SECRET_KEY", secrets.token_urlsafe(64)))
     api_prefix: str = "/api/v1"
     base_dir: Path = Path(__file__).resolve().parent.parent
     cors_origins: str = "http://localhost:5173,http://localhost:3000"

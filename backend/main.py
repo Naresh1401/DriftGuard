@@ -154,6 +154,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ── Security headers middleware ──────────────────────
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request as StarletteRequest
+from starlette.responses import Response
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if settings.app_env.value != "development":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+
 # ── Register Routes ──────────────────────────────────
 
 from api.routes.health import router as health_router
@@ -169,8 +192,10 @@ from api.routes.scanner import router as scanner_router
 from api.routes.drift_map import router as drift_map_router
 from api.routes.threat_intel import router as threat_intel_router
 from api.routes.scans import router as scans_router
+from api.routes.auth_routes import router as auth_router
 
 app.include_router(health_router, prefix=settings.api_prefix)
+app.include_router(auth_router, prefix=settings.api_prefix)
 app.include_router(signals_router, prefix=settings.api_prefix)
 app.include_router(alerts_router, prefix=settings.api_prefix)
 app.include_router(calibration_router, prefix=settings.api_prefix)

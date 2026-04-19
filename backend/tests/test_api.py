@@ -6,6 +6,21 @@ Uses FastAPI TestClient for synchronous testing.
 import pytest
 from fastapi.testclient import TestClient
 from main import app
+from api.middleware.auth import get_current_user
+from models import User, UserRole
+
+
+async def _mock_admin_user():
+    """Override auth — return a test admin user."""
+    return User(
+        email="test@driftguard.local",
+        full_name="Test Admin",
+        role=UserRole.ADMIN,
+        organization="Test",
+    )
+
+
+app.dependency_overrides[get_current_user] = _mock_admin_user
 
 
 @pytest.fixture

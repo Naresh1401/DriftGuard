@@ -10,6 +10,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
   const res = await fetch(`${BASE}${path}`, { ...options, headers })
   if (!res.ok) {
+    if (res.status === 401 && !path.startsWith('/auth/')) {
+      localStorage.removeItem('driftguard_token')
+      localStorage.removeItem('driftguard_role')
+      window.location.href = '/login'
+      throw new Error('Session expired')
+    }
     const body = await res.text()
     throw new Error(`API ${res.status}: ${body}`)
   }
@@ -17,6 +23,17 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // Auth
+  login: (email: string, password: string) =>
+    request<{ access_token: string; role: string; email: string; full_name: string; expires_in: number }>('/auth/login', {
+      method: 'POST', body: JSON.stringify({ email, password }),
+    }),
+  register: (email: string, password: string, full_name: string, organization?: string) =>
+    request<{ access_token: string; role: string; email: string; full_name: string; expires_in: number }>('/auth/register', {
+      method: 'POST', body: JSON.stringify({ email, password, full_name, organization: organization || '', role: 'viewer' }),
+    }),
+  getMe: () => request<{ email: string; full_name: string; role: string; organization: string }>('/auth/me'),
+
   // Health
   health: () => request<{ status: string }>('/health'),
 

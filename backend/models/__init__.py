@@ -190,9 +190,9 @@ class CalibrationDelivery(BaseModel):
 class UserRole(str, Enum):
     COMPLIANCE_OFFICER = "compliance_officer"
     CISO = "ciso"
-    GOVERNANCE_ARCHITECT = "governance_architect"
-    FRAMEWORK_TEAM = "framework_team"
+    NI_ARCHITECT = "ni_architect"
     ADMIN = "admin"
+    VIEWER = "viewer"
 
 
 class User(BaseModel):

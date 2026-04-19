@@ -1,4 +1,4 @@
-import { Outlet, NavLink, Navigate, useLocation } from 'react-router-dom'
+import { Outlet, NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth, NAV_ACCESS } from '../auth'
 import {
   LayoutDashboard,
@@ -8,13 +8,12 @@ import {
   Globe,
   Shield,
   BarChart3,
-  ChevronDown,
   DatabaseZap,
   Radar,
   ShieldAlert,
   ScanSearch,
+  LogOut,
 } from 'lucide-react'
-import { useState } from 'react'
 import clsx from 'clsx'
 import type { UserRole } from '../types'
 
@@ -60,8 +59,8 @@ const ROLE_COLORS: Record<UserRole, string> = {
 }
 
 export default function Layout() {
-  const { role, setRole } = useAuth()
-  const [roleOpen, setRoleOpen] = useState(false)
+  const { role, logout } = useAuth()
+  const navigate = useNavigate()
   const location = useLocation()
 
   // Route guard: redirect to dashboard if user navigates to a restricted page
@@ -116,43 +115,21 @@ export default function Layout() {
             ))}
           </nav>
 
-          {/* Role switcher */}
-          <div className="p-4 border-t border-gray-100 relative">
-            <div className="mb-2">
+          {/* User info & logout */}
+          <div className="p-4 border-t border-gray-100">
+            <div className="mb-3">
               <span className={clsx('inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border', ROLE_COLORS[role])}>
                 {ROLE_LABELS[role]}
               </span>
               <p className="text-xs text-gray-400 mt-1">{ROLE_DESCRIPTIONS[role]}</p>
             </div>
             <button
-              onClick={() => setRoleOpen(!roleOpen)}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 text-sm text-gray-700 hover:bg-gray-100"
+              onClick={() => { logout(); navigate('/login') }}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-gray-50 text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
             >
-              <span className="text-xs text-gray-500">Switch role</span>
-              <ChevronDown size={16} />
+              <LogOut size={16} />
+              <span>Sign Out</span>
             </button>
-            {roleOpen && (
-              <div className="absolute bottom-full left-4 right-4 mb-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 py-1">
-                {(Object.keys(ROLE_LABELS) as UserRole[]).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => {
-                      setRole(r)
-                      setRoleOpen(false)
-                    }}
-                    className={clsx(
-                      'w-full text-left px-3 py-2 hover:bg-gray-50',
-                      r === role ? 'bg-gray-50' : ''
-                    )}
-                  >
-                    <span className={clsx('inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border', ROLE_COLORS[r])}>
-                      {ROLE_LABELS[r]}
-                    </span>
-                    <span className="block text-xs text-gray-400 mt-0.5 ml-0.5">{ROLE_DESCRIPTIONS[r]}</span>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         </aside>
 

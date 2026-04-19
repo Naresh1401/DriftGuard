@@ -18,15 +18,6 @@ async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> User:
     """Extract and validate the current user from the JWT token."""
-    if settings.app_env.value == "development" and not credentials:
-        # Dev mode: return a default admin user
-        return User(
-            email="dev@driftguard.local",
-            full_name="Development User",
-            role=UserRole.ADMIN,
-            organization="DriftGuard Dev",
-        )
-
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

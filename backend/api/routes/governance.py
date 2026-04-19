@@ -68,7 +68,7 @@ async def get_pending_nist_mappings(
 @router.get("/critical-reviews/pending")
 async def get_pending_critical_reviews(
     user: User = Depends(require_role(
-        UserRole.CISO, UserRole.GOVERNANCE_ARCHITECT, UserRole.ADMIN
+        UserRole.CISO, UserRole.NI_ARCHITECT, UserRole.ADMIN
     )),
 ):
     """Get Critical alerts pending human review."""
@@ -80,7 +80,7 @@ async def get_pending_critical_reviews(
 async def approve_critical_alert(
     alert_id: str,
     user: User = Depends(require_role(
-        UserRole.CISO, UserRole.GOVERNANCE_ARCHITECT, UserRole.ADMIN
+        UserRole.CISO, UserRole.NI_ARCHITECT, UserRole.ADMIN
     )),
 ):
     """Approve a Critical alert for external notification."""
@@ -157,7 +157,7 @@ async def approve_gate_action(
     gate_type: str,
     action_id: str,
     user: User = Depends(require_role(
-        UserRole.CISO, UserRole.GOVERNANCE_ARCHITECT, UserRole.ADMIN
+        UserRole.CISO, UserRole.NI_ARCHITECT, UserRole.ADMIN
     )),
 ):
     """Approve a governance gate action."""
@@ -195,7 +195,7 @@ async def reject_gate_action(
     gate_type: str,
     action_id: str,
     user: User = Depends(require_role(
-        UserRole.CISO, UserRole.GOVERNANCE_ARCHITECT, UserRole.ADMIN
+        UserRole.CISO, UserRole.NI_ARCHITECT, UserRole.ADMIN
     )),
 ):
     """Reject a governance gate action."""
@@ -220,7 +220,7 @@ async def get_audit_log(
     offset: int = 0,
     action: Optional[str] = None,
     user: User = Depends(require_role(
-        UserRole.CISO, UserRole.GOVERNANCE_ARCHITECT, UserRole.ADMIN
+        UserRole.CISO, UserRole.NI_ARCHITECT, UserRole.ADMIN
     )),
 ):
     """Get the immutable audit log."""
