@@ -445,3 +445,69 @@ This section captures the open questions where strategic input would most accele
 ---
 
 *This document is intended for strategic advisors and early partners. All financial projections are estimates based on comparable SaaS company benchmarks.*
+
+---
+
+## Appendix A — Investor-Grade V2 Addendum (April 2026)
+
+### A.1 What's New In V2
+
+| Capability | V1 (shipped) | V2 (shipped this release) |
+|---|---|---|
+| Drift detection | Pattern-level alerts | Pattern + **Predictive Breach Probability** (30/60/90-day horizon) |
+| Data flow | Poll-based UI | **Server-Sent Events** (live push, <3s latency) |
+| Risk math | Severity aggregation | Saturating-curve composite (pattern × confidence × temporal decay + NIST criticality) |
+| Reporting | Static dashboard | Per-domain trend history with 95% confidence intervals |
+| Deployment | Single Render service | Render + SPA with SSE, clean cache rebuild pipeline |
+| Ethics | NIST mapping | NIST + IBM 2024 Cost-of-Breach calibrated baselines |
+
+**Net effect:** DriftGuard now outputs a number a CFO can understand ("2.2% breach probability over 30 days, trending flat") alongside the behavioural signal a CISO needs.
+
+### A.2 Unit Economics Refresh
+
+Assumptions (mid-market SaaS benchmarks, TAM = human-centric cybersecurity):
+
+- **ACV tier 1** (50–500 employees): $18k/yr
+- **ACV tier 2** (500–5k employees): $72k/yr
+- **ACV tier 3** (5k+ employees, regulated): $240k/yr
+- Gross margin: 82% (pure SaaS, SQLite-on-Render → PostgreSQL migration path costed at 3% of revenue)
+- CAC payback: ~11 months (inbound-led via compliance officers)
+- Net revenue retention target: 118% (expansion via per-domain add-on)
+
+| Year | Logos | Blended ACV | ARR | Burn Multiple |
+|---|---:|---:|---:|---:|
+| 2026 | 12 | $28k | $336k | 2.1x |
+| 2027 | 48 | $41k | $1.97M | 1.3x |
+| 2028 | 140 | $58k | $8.12M | 0.9x |
+| 2029 | 310 | $74k | $22.9M | 0.6x |
+
+### A.3 Defensibility Moats (V2)
+
+1. **Behavioural + technical telemetry fusion** — no incumbent combines drift patterns (Fatigue, Overconfidence, Hurry, QuietFear, Hoarding, ComplianceTheater) with NIST control criticality in a single probability score.
+2. **Calibrated priors** — domain baselines are anchored to IBM *Cost of a Data Breach 2024* per-industry means, making the score defensible in board rooms.
+3. **Network effect via Calibration RAG** — every approved/rejected alert improves the retrieval corpus, so the engine gets sharper with each customer.
+4. **Regulatory wedge** — HIPAA, PCI-DSS, NIST 800-53 AU-6/IR-6/AT-2 controls require exactly the evidence DriftGuard generates by default.
+
+### A.4 Milestones Unblocked By V2
+
+- **Series A readiness:** Predictive number + live push stream = demo-able "wow moment" for investors.
+- **POV (Proof-of-Value) offer:** 30-day trial produces a defensible $-value breach-probability reduction, convertible to a paid pilot.
+- **Channel partnerships:** SSE stream + OpenAPI spec are ready to feed Splunk / Sentinel / CrowdStrike marketplaces as a behavioural-signal source.
+
+### A.5 12-Month Execution Plan (Post-V2)
+
+| Quarter | Objective | KPI |
+|---|---|---|
+| Q2 2026 | 5 design-partner POVs in healthcare & finance | 3 signed LOIs |
+| Q3 2026 | PostgreSQL + multi-tenant migration, SOC2 Type 1 | 99.5% uptime SLA |
+| Q4 2026 | Slack / PagerDuty / MS Teams native connectors | 2 marketplace listings |
+| Q1 2027 | Series A raise ($4–6M) on $1M ARR run-rate | Term sheet |
+
+### A.6 Asks
+
+- **Design partners** in HIPAA-regulated providers (target: 3 hospitals, 1 regional insurer)
+- **Advisors** on procurement side of CISO buying cycle
+- **Seed extension** of $750k for 18-month runway to Series A milestones
+
+---
+

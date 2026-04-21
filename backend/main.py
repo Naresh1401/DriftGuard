@@ -202,6 +202,7 @@ from api.routes.scans import router as scans_router
 from api.routes.auth_routes import router as auth_router
 from api.routes.convenience import router as convenience_router
 from api.routes.risk_forecast import router as risk_forecast_router
+from api.routes.live_stream import router as live_stream_router
 
 app.include_router(health_router, prefix=settings.api_prefix)
 app.include_router(auth_router, prefix=settings.api_prefix)
@@ -219,6 +220,7 @@ app.include_router(threat_intel_router, prefix=settings.api_prefix)
 app.include_router(scans_router, prefix=settings.api_prefix)
 app.include_router(convenience_router, prefix=settings.api_prefix)
 app.include_router(risk_forecast_router, prefix=settings.api_prefix)
+app.include_router(live_stream_router, prefix=settings.api_prefix)
 
 
 @app.get("/")

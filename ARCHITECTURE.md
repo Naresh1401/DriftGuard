@@ -136,3 +136,48 @@ All require JWT auth.
 - 92 backend pytest cases (API, drift patterns, guardrails, pipeline, severity)
 - Frontend: TypeScript strict mode, Vite build
 - E2E: role-login smoke tests on every commit
+
+---
+
+## V2 Additions (April 2026)
+
+### Real-time push: Server-Sent Events
+
+`GET /api/v1/stream/events?token=<jwt>` — long-lived SSE channel.
+
+Event types:
+
+| Event | Payload | Cadence |
+|---|---|---|
+| `hello` | `{ ts, msg }` | once on connect |
+| `pulse` | `{ ts, active_alerts, domains[] }` | every ~3s |
+| `alert` | `{ alert_id, domain, pattern, level, severity, confidence, ts }` | on new alert only (de-duped) |
+| `error` | `{ ts, error }` | on handler exception |
+
+Design notes:
+
+- JWT in query string (EventSource cannot set Authorization header); validated via `jose.jwt.decode` against `settings.secret_key`.
+- 15-second keep-alive comments to survive intermediate proxies (Render, Cloudflare).
+- Diff-based alert emission: tracks `seen_ids` per connection so we never double-emit.
+- Frontend consumes via `new EventSource(...)` in [LiveStream.tsx](frontend/src/components/LiveStream.tsx).
+
+### Predictive Breach Probability
+
+$$P_\text{breach} = \text{baseline}_d + (1 - \text{baseline}_d) \cdot s(R_\text{pattern}) \cdot 0.85$$
+
+Where $s(x) = 1 - e^{-0.45 x}$ is a saturating curve bounded in $[0,1)$, and $R_\text{pattern}$ is the temporally-decayed, confidence-weighted sum of drift-pattern risks plus NIST control criticality.
+
+Calibrated against IBM *Cost of a Data Breach 2024* baselines per domain (healthcare 3.2%, finance 2.4%, government 2.1%, enterprise 1.8%, retail 2.0%, education 1.6%).
+
+### Deploy topology additions
+
+```
+Render Web Service (single process)
+  ├─ FastAPI (uvicorn, port $PORT)
+  │   ├─ /api/v1/*       ← REST
+  │   └─ /api/v1/stream/events  ← SSE (streaming response, no buffering)
+  └─ SPA static serve   ← frontend/dist via StaticFiles + catch-all
+```
+
+SSE requires `X-Accel-Buffering: no` and `Cache-Control: no-cache` headers — both set by the route.
+

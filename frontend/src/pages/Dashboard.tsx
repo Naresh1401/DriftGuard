@@ -22,6 +22,7 @@ import { useAuth } from '../auth'
 import type { Permission } from '../auth'
 import { AlertBadge, LoadingSpinner, PatternTag } from '../components/Shared'
 import RiskForecastCard from '../components/RiskForecastCard'
+import LiveStream from '../components/LiveStream'
 import type {
   Alert,
   HealthScore,
@@ -249,8 +250,11 @@ function AdminDashboard({ health, alerts, weeklyData }: { health: HealthScore; a
         <KPICard icon={<Eye size={20} />} label="Watch" value={health.watch_alerts} color="text-yellow-600" />
       </div>
 
-      {/* Predictive risk forecast (v2) */}
-      <RiskForecastCard domain="enterprise" horizonDays={30} />
+      {/* Predictive risk forecast + Live stream (v2) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <RiskForecastCard domain="enterprise" horizonDays={30} />
+        <LiveStream />
+      </div>
 
       {/* System status row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -361,8 +365,11 @@ function CISODashboard({ health, alerts, nistData }: { health: HealthScore; aler
         <KPICard icon={<Zap size={20} />} label="Board Readiness" value={boardReadiness} suffix="%" color="text-drift-700" />
       </div>
 
-      {/* Predictive breach forecast */}
-      <RiskForecastCard domain="enterprise" horizonDays={30} />
+      {/* Predictive breach forecast + live SSE stream */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <RiskForecastCard domain="enterprise" horizonDays={30} />
+        <LiveStream />
+      </div>
 
       {/* NIST radar + risk table side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
