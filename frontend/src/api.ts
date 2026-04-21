@@ -164,6 +164,30 @@ export const api = {
   exportReport: (format: 'csv' | 'json', reportType: string, domain = 'enterprise') =>
     request<Blob>(`/reports/export?format=${format}&report_type=${reportType}&domain=${domain}`),
 
+  // Risk Forecast (v2 predictive engine)
+  getRiskForecastAll: () =>
+    request<{ domains: Array<{ domain: string; breach_probability_pct: number; active_alerts: number; baseline_pct: number }> }>(
+      '/risk-forecast/'
+    ),
+  getRiskForecast: (domain = 'enterprise', horizonDays = 30) =>
+    request<{
+      domain: string
+      horizon_days: number
+      breach_probability_pct: number
+      confidence_interval: { low: number; high: number }
+      risk_level: string
+      components: { domain_baseline_pct: number; drift_modifier: number; pattern_risk_score: number; nist_risk_score: number }
+      top_contributing_patterns: Array<{ pattern: string; contribution: number }>
+      top_nist_gaps: Array<{ control: string; risk: number }>
+      active_signals: number
+      computed_at: string
+      methodology: string
+    }>(`/risk-forecast/${encodeURIComponent(domain)}?horizon_days=${horizonDays}`),
+  getRiskTrend: (domain = 'enterprise', days = 14) =>
+    request<{ domain: string; days: number; trend: Array<{ date: string; breach_probability_pct: number; active_alerts: number }> }>(
+      `/risk-forecast/${encodeURIComponent(domain)}/trend?days=${days}`
+    ),
+
   // Threat Intelligence
   getThreatFeed: (severity?: string, pattern?: string) => {
     const qs = new URLSearchParams()
