@@ -1029,26 +1029,24 @@ flowchart LR
 
 ```mermaid
 quadrantChart
-    title Ethical breadth × predictive depth
+    title Competitive positioning - ethics vs predictive depth
     x-axis "Surveillance-heavy" --> "Ethics-first"
-    y-axis "Reactive (post-breach)" --> "Predictive (pre-breach)"
-    quadrant-1 "Predictive · Ethics-first (DriftGuard zone)"
-    quadrant-2 "Predictive · Surveillance"
-    quadrant-3 "Reactive · Surveillance"
-    quadrant-4 "Reactive · Ethics-first"
-    "DriftGuard": [0.85, 0.85]
-    "Splunk UBA": [0.25, 0.55]
-    "Sentinel UEBA": [0.30, 0.55]
-    "Exabeam": [0.30, 0.50]
-    "Securonix": [0.30, 0.50]
-    "DTEX": [0.15, 0.45]
-    "Forcepoint": [0.15, 0.40]
-    "Proofpoint ITM": [0.20, 0.35]
-    "Code42": [0.40, 0.20]
-    "Darktrace": [0.55, 0.45]
-    "CrowdStrike": [0.55, 0.30]
-    "Vectra": [0.60, 0.40]
+    y-axis "Reactive" --> "Predictive"
+    quadrant-1 "DriftGuard zone"
+    quadrant-2 "Predictive surveillance"
+    quadrant-3 "Reactive surveillance"
+    quadrant-4 "Reactive ethics-first"
+    "DriftGuard": [0.88, 0.90]
+    "Splunk UBA": [0.22, 0.62]
+    "Microsoft Sentinel": [0.42, 0.55]
+    "CrowdStrike Falcon": [0.55, 0.40]
+    "Exabeam": [0.30, 0.48]
+    "DTEX": [0.18, 0.38]
+    "Darktrace": [0.62, 0.50]
+    "Proofpoint ITM": [0.25, 0.25]
 ```
+
+> Read: top-right = predictive + ethics-first (where DriftGuard is alone). Top-left = predictive but surveillance-heavy (legacy SIEM/UEBA). Bottom-left = reactive log-and-search tools.
 
 ### C.12 Five Moats (Mind-Map)
 
