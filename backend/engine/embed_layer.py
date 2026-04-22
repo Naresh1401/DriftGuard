@@ -67,6 +67,15 @@ def _approvers_for(pattern: AIBreachPatternType) -> List[str]:
     return _PATTERN_APPROVER_ROLES.get(pattern, ["ciso"])
 
 
+def default_approver_map() -> Dict[str, List[str]]:
+    """Return the per-pattern approver defaults keyed by string value.
+
+    Used by ``TenantApproverConfig`` so a fresh tenant store inherits
+    the same defaults the appendix-O ``RecommendationEngine`` uses.
+    """
+    return {p.value: list(roles) for p, roles in _PATTERN_APPROVER_ROLES.items()}
+
+
 # ── Event collection layer ───────────────────────────
 
 class EventCollector:
@@ -159,17 +168,39 @@ class EventCollector:
 # ── Recommendation builder ───────────────────────────
 
 class RecommendationEngine:
-    """Builds structured suggestions from detector output + playbooks."""
+    """Builds structured suggestions from detector output + playbooks.
 
-    def __init__(self, *, playbooks_module: Any = None) -> None:
+    Optional collaborators (Appendix P):
+      * ``tenant_config`` — per-org override of approver roles.
+      * ``classifier``    — learned head that re-weights confidence
+        based on the historical approval / rejection log.
+    Both are duck-typed; either may be ``None`` and the engine falls
+    back to the appendix-O behaviour.
+    """
+
+    def __init__(
+        self,
+        *,
+        playbooks_module: Any = None,
+        tenant_config: Any = None,
+        classifier: Any = None,
+    ) -> None:
         # Late-import the playbook registry so this module stays
         # importable even if playbooks are reorganised.
         if playbooks_module is None:
             from core import ai_breach_playbooks as _pb
             playbooks_module = _pb
         self._pb = playbooks_module
+        self._tenant_config = tenant_config
+        self._classifier = classifier
 
-    def build(self, detection: Dict[str, Any]) -> Dict[str, Any]:
+    def build(
+        self,
+        detection: Dict[str, Any],
+        *,
+        org_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         """Return a Recommendation dict for a single detection."""
         pattern_str = detection.get("pattern", "")
         try:
@@ -182,7 +213,18 @@ class RecommendationEngine:
             playbook = self._pb.playbook_to_dict(pb) if pb is not None else None
         except Exception:
             playbook = None
-        approvers = _approvers_for(pattern)
+        # Learned-classifier calibration (no-op when classifier=None
+        # or when the head doesn't have enough samples yet).
+        if self._classifier is not None:
+            try:
+                detection = self._classifier.calibrate(detection, context=context or {})
+            except Exception:
+                pass
+        # Tenant-aware approver lookup.
+        if self._tenant_config is not None:
+            approvers = self._tenant_config.approvers_for(pattern_str, org_id=org_id)
+        else:
+            approvers = _approvers_for(pattern)
         priority = self._priority_for(detection)
         return {
             "id": str(uuid.uuid4()),
@@ -192,7 +234,10 @@ class RecommendationEngine:
             "nist_ai_rmf_function": detection.get("nist_ai_rmf_function"),
             "risk_score": detection.get("risk_score"),
             "confidence": detection.get("confidence"),
+            "learned_confidence": detection.get("learned_confidence"),
+            "learned_samples": detection.get("learned_samples"),
             "actor_id": (detection.get("signal_ids") or [None])[0],
+            "org_id": org_id,
             "summary": detection.get("plain_language_summary")
                 or detection.get("reasoning", ""),
             "playbook": playbook,
@@ -201,8 +246,14 @@ class RecommendationEngine:
             "auto_executable": False,  # by policy — never auto-execute
         }
 
-    def build_many(self, detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        return [self.build(d) for d in detections]
+    def build_many(
+        self,
+        detections: List[Dict[str, Any]],
+        *,
+        org_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        return [self.build(d, org_id=org_id, context=context) for d in detections]
 
     @staticmethod
     def _priority_for(det: Dict[str, Any]) -> str:
@@ -358,6 +409,15 @@ class ApprovalWorkflow:
                 "actor": approver_id,
                 "role": approver_role,
                 "reason": reason,
+                # Carry the recommendation snapshot so a downstream
+                # learner (Appendix P) can train without a join.
+                "pattern": item.get("pattern"),
+                "detection": {
+                    "pattern": item.get("pattern"),
+                    "risk_score": item.get("risk_score"),
+                    "confidence": item.get("confidence"),
+                },
+                "context": item.get("learning_context") or {},
             })
             self._persist()
             return dict(item)

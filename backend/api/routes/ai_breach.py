@@ -53,7 +53,15 @@ from engine.embed_layer import (
     PENDING,
     REJECTED,
     RecommendationEngine,
+    default_approver_map,
 )
+from engine.agent_discovery import (
+    scan_artefacts as discovery_scan_artefacts,
+    scan_text as discovery_scan_text,
+    summarise as discovery_summarise,
+)
+from engine.learned_classifier import LearnedClassifier
+from engine.tenant_config import TenantApproverConfig
 
 
 router = APIRouter(prefix="/ai-breach", tags=["AI Breach"])
@@ -102,6 +110,31 @@ _APPROVALS_PATH = os.environ.get(
     str(__import__("pathlib").Path(__file__).resolve().parents[2] / "data" / "approvals.json"),
 )
 _APPROVALS = ApprovalWorkflow(storage_path=_APPROVALS_PATH)
+
+# ── Appendix P state ─────────────────────────────────
+# Per-tenant approver overrides, learned-confidence head, and the
+# discovery scanner are stateless except for the two below.
+_TENANTS_PATH = os.environ.get(
+    "DRIFTGUARD_TENANTS_PATH",
+    str(__import__("pathlib").Path(__file__).resolve().parents[2] / "data" / "tenant_approvers.json"),
+)
+_TENANT_CONFIG = TenantApproverConfig(
+    storage_path=_TENANTS_PATH,
+    defaults=default_approver_map(),
+)
+
+_CLASSIFIER_PATH = os.environ.get(
+    "DRIFTGUARD_CLASSIFIER_PATH",
+    str(__import__("pathlib").Path(__file__).resolve().parents[2] / "data" / "learned_classifier.json"),
+)
+_CLASSIFIER = LearnedClassifier(storage_path=_CLASSIFIER_PATH)
+
+# Re-bind the recommender so it knows about both. Existing endpoints
+# that already call _RECOMMENDER.build_many keep working unchanged.
+_RECOMMENDER = RecommendationEngine(
+    tenant_config=_TENANT_CONFIG,
+    classifier=_CLASSIFIER,
+)
 
 
 # ── Request / response schemas ───────────────────────
@@ -602,6 +635,7 @@ class CollectRequest(BaseModel):
     ``AISignal`` and run through the same detector pipeline as ``/scan``.
     Pending recommendations are filed automatically on detection."""
     site_id: Optional[str] = None
+    org_id: Optional[str] = None
     events: List[Dict[str, Any]]
 
 
@@ -637,13 +671,36 @@ async def collect(req: CollectRequest) -> Dict[str, Any]:
     for actor, score in actor_max.items():
         _REALTIME.observe(actor, score)
     det_dicts = [d.to_dict() for d in detections]
-    recs = _RECOMMENDER.build_many(det_dicts)
+    # Light-touch context for the learned classifier: vendor inferred
+    # from any URL/host present in the batch, and a global injection
+    # flag if any signal carried instruction tokens. Both are optional.
+    joined_text = " ".join(
+        f"{e.get('text', '')} {e.get('destination', '')}"
+        for e in req.events if isinstance(e, dict)
+    )
+    discovered = discovery_scan_text(joined_text, source_label="collect")
+    inferred_vendor = discovered[0].vendor if discovered else None
+    learn_ctx = {
+        "vendor": inferred_vendor,
+        "contains_instruction_tokens": any(
+            s.contains_instruction_tokens for s in sigs
+        ),
+    }
+    recs = _RECOMMENDER.build_many(det_dicts, org_id=req.org_id, context=learn_ctx)
+    # Stash the learning context with each item so the approval log
+    # can replay it as training data later (Appendix P).
+    for r in recs:
+        r["learning_context"] = learn_ctx
     submitted = _APPROVALS.submit_many(recs)
+    # Train one online step per decision that lands during this call
+    # is handled by /classifier/train; here we just file the recs.
     return {
         "site_id": req.site_id,
+        "org_id": req.org_id,
         "ingested_events": len(sigs),
         "detections": det_dicts,
         "aggregate": agg,
+        "discovered_endpoints": [ep.to_dict() for ep in discovered],
         "recommendations_pending": submitted,
     }
 
@@ -690,7 +747,7 @@ async def decide_recommendation(
     rec_id: str, req: DecisionRequest
 ) -> Dict[str, Any]:
     try:
-        return _APPROVALS.decide(
+        decided = _APPROVALS.decide(
             rec_id,
             decision=req.decision,
             approver_id=req.approver_id,
@@ -703,6 +760,21 @@ async def decide_recommendation(
         raise HTTPException(status_code=403, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    # Train the learned head from this single decision (best-effort).
+    try:
+        label = 1 if req.decision == APPROVED else 0
+        _CLASSIFIER.train_one(
+            {
+                "pattern": decided.get("pattern"),
+                "risk_score": decided.get("risk_score"),
+                "confidence": decided.get("confidence"),
+            },
+            context=decided.get("learning_context") or {},
+            label=label,
+        )
+    except Exception:
+        pass
+    return decided
 
 
 @router.get("/recommendations/log/decisions")
@@ -713,6 +785,108 @@ async def recommendations_decision_log(limit: int = 100) -> Dict[str, Any]:
     capped = max(1, min(int(limit), 500))
     entries = _APPROVALS.decision_log(limit=capped)
     return {"count": len(entries), "entries": entries}
+
+
+# ── Appendix P: discovery + learned classifier + tenant config ──
+
+class DiscoveryRequest(BaseModel):
+    """Free-form artefacts (configs, env exports, code fragments, URLs)
+    the host wants scanned for AI / agent endpoints. Strings only —
+    we never touch the network."""
+    artefacts: List[Dict[str, str]]
+
+
+@router.post("/discovery/scan")
+async def discovery_scan(req: DiscoveryRequest) -> Dict[str, Any]:
+    """Scan submitted text artefacts for AI / agent endpoints.
+
+    Returns the raw discovered endpoints plus a compact summary. Pure
+    string analysis — no outbound network calls are ever made.
+    """
+    if not req.artefacts:
+        raise HTTPException(status_code=400, detail="artefacts must be non-empty")
+    eps = discovery_scan_artefacts(req.artefacts)
+    return {
+        "count": len(eps),
+        "endpoints": [ep.to_dict() for ep in eps],
+        "summary": discovery_summarise(eps),
+    }
+
+
+@router.get("/classifier/stats")
+async def classifier_stats() -> Dict[str, Any]:
+    """Inspect the learned-confidence head: per-pattern weights and
+    sample counts. When ``samples_per_pattern[p] < 5`` the head falls
+    back to the heuristic confidence for that pattern."""
+    return _CLASSIFIER.stats()
+
+
+@router.post("/classifier/train")
+async def classifier_train() -> Dict[str, Any]:
+    """Replay the entire approval decision log into the learned head.
+
+    Idempotent in the sense that it only counts ``decide`` transitions
+    and skips everything else; calling it twice doubles the influence
+    of every recorded decision. Operators typically call this once
+    after an offline review session."""
+    log = _APPROVALS.decision_log(limit=500)
+    applied = _CLASSIFIER.train_from_decision_log(log)
+    return {
+        "applied_per_pattern": applied,
+        "stats": _CLASSIFIER.stats(),
+    }
+
+
+class TenantOverridesRequest(BaseModel):
+    """Per-tenant approver-role overrides keyed by pattern string
+    (e.g. ``"Shadow_AI": ["ciso", "head_of_data"]``)."""
+    overrides: Dict[str, List[str]]
+
+
+@router.get("/tenants")
+async def list_tenants() -> Dict[str, Any]:
+    """List every tenant with stored approver overrides."""
+    return {
+        "tenants": _TENANT_CONFIG.list_tenants(),
+        "defaults": default_approver_map(),
+    }
+
+
+@router.get("/tenants/{org_id}/approvers")
+async def get_tenant_approvers(org_id: str) -> Dict[str, Any]:
+    """Return the tenant's overrides plus the effective resolution
+    (override-then-default) per pattern."""
+    overrides = _TENANT_CONFIG.get_overrides(org_id)
+    defaults = default_approver_map()
+    effective = {
+        p: _TENANT_CONFIG.approvers_for(p, org_id=org_id)
+        for p in defaults.keys()
+    }
+    return {
+        "org_id": org_id,
+        "overrides": overrides,
+        "effective": effective,
+    }
+
+
+@router.put("/tenants/{org_id}/approvers")
+async def set_tenant_approvers(
+    org_id: str, req: TenantOverridesRequest
+) -> Dict[str, Any]:
+    """Replace the tenant's per-pattern approver-role overrides."""
+    try:
+        stored = _TENANT_CONFIG.set_overrides(org_id, req.overrides)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"org_id": org_id, "overrides": stored}
+
+
+@router.delete("/tenants/{org_id}/approvers")
+async def clear_tenant_approvers(org_id: str) -> Dict[str, Any]:
+    """Remove the tenant's overrides. Pattern resolution falls back
+    to the platform defaults."""
+    removed = _TENANT_CONFIG.clear_overrides(org_id)
+    return {"org_id": org_id, "removed": removed}
 
 
 @router.get("/forecast/history")
