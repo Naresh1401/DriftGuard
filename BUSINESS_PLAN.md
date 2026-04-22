@@ -2270,3 +2270,42 @@ Anchors are valuable only if they can be *audited*. With Appendix H–J a regula
 ---
 
 *End of Appendix K — Full anchor-history verification.*
+
+---
+
+# Appendix L — Operator-surfaced anchor-history audit
+
+Appendix K shipped `GET /api/v1/ai-breach/audit/anchors`, the full anchor-history walker. This appendix surfaces it on the operator UI so the regulator-grade evidence is one click away.
+
+## L.1 Frontend change
+
+The Audit Chain card on the AI Breach page now exposes three buttons:
+
+- **Mint anchor** — `POST /audit/anchor`
+- **Verify** — `POST /audit/anchor/verify` of the most recent minted anchor
+- **Verify all** — `GET /audit/anchors` (new), runs the full-history audit and renders a single line:
+  - `history · N anchors · all linked` (green) when intact
+  - `history · N anchors · broken at #i (<reason>)` (red) when any anchor fails
+
+The result is the same shape returned by `verify_anchor_history`. Operators no longer need to verify anchors one at a time; one click audits the entire publication chain.
+
+## L.2 Source mapping (extends §K.4)
+
+| Claim in §L | Code reference |
+| --- | --- |
+| Verify-all button + state | `frontend/src/pages/AIBreach.tsx::verifyAnchorHistory / anchorHistory` |
+
+## L.3 Surface map (current)
+
+| Surface | Endpoint(s) |
+| --- | --- |
+| Audit Chain card · Mint | `POST /api/v1/ai-breach/audit/anchor` |
+| Audit Chain card · Verify | `POST /api/v1/ai-breach/audit/anchor/verify` |
+| Audit Chain card · Verify all | `GET  /api/v1/ai-breach/audit/anchors` |
+| Audit Chain card · Length / head | `GET  /api/v1/ai-breach/audit/verify` |
+| Live Risk Stream card | `GET  /api/v1/ai-breach/stream` (SSE) |
+| Agent Circuit Breaker card | `GET  /api/v1/ai-breach/quarantine` |
+
+---
+
+*End of Appendix L — Operator-surfaced anchor-history audit.*

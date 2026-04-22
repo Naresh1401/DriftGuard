@@ -109,6 +109,7 @@ export default function AIBreach() {
   const [quarantine, setQuarantine] = useState<{ count: number; threshold: number; window_minutes: number } | null>(null)
   const [anchor, setAnchor] = useState<{ anchor_id: string; head: string; length: number; timestamp: string } | null>(null)
   const [anchorVerify, setAnchorVerify] = useState<{ valid: boolean; reason: string; growth_since_anchor?: number } | null>(null)
+  const [anchorHistory, setAnchorHistory] = useState<{ count: number; valid: boolean; broken_at: number; reason?: string } | null>(null)
   const [liveTick, setLiveTick] = useState<{ ts: string; forecast: { ewma: number | null; samples: number } } | null>(null)
 
   async function loadGovernance() {
@@ -146,6 +147,15 @@ export default function AIBreach() {
         body: JSON.stringify(anchor),
       })
       if (r.ok) setAnchorVerify(await r.json())
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  async function verifyAnchorHistory() {
+    try {
+      const r = await fetch(`${API_BASE}/ai-breach/audit/anchors`)
+      if (r.ok) setAnchorHistory(await r.json())
     } catch {
       /* best-effort */
     }
@@ -423,7 +433,7 @@ export default function AIBreach() {
               head: {audit.head.slice(0, 32)}…
             </div>
           )}
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex gap-2 flex-wrap">
             <button
               onClick={createAnchor}
               className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-700"
@@ -437,6 +447,12 @@ export default function AIBreach() {
             >
               Verify
             </button>
+            <button
+              onClick={verifyAnchorHistory}
+              className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-700"
+            >
+              Verify all
+            </button>
           </div>
           {anchor && (
             <div className="mt-2 text-[10px] font-mono text-emerald-700 truncate" title={anchor.anchor_id}>
@@ -448,6 +464,14 @@ export default function AIBreach() {
               {anchorVerify.valid
                 ? `verified · +${anchorVerify.growth_since_anchor ?? 0} entries since`
                 : `invalid · ${anchorVerify.reason}`}
+            </div>
+          )}
+          {anchorHistory && (
+            <div className={`mt-1 text-[10px] ${anchorHistory.valid ? 'text-emerald-700' : 'text-rose-700'}`}>
+              history · {anchorHistory.count} anchors ·{' '}
+              {anchorHistory.valid
+                ? 'all linked'
+                : `broken at #${anchorHistory.broken_at} (${anchorHistory.reason ?? 'unknown'})`}
             </div>
           )}
         </div>
