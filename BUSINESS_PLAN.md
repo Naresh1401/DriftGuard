@@ -2168,3 +2168,61 @@ Project test count: **133 → 137 passing**.
 ---
 
 *End of Appendix I — Anchor verification. Two of three §G.4 gaps fully closed end-to-end; only #2 (multi-worker quarantine) remains open and is named.*
+
+---
+
+# Appendix J — Linked anchor chain + restart-safe quarantine
+
+This appendix records two further additive advances after Appendix I.
+
+## J.1 Linked anchor chain (anchors-of-anchors)
+
+Anchors minted in Appendices H–I were independent snapshots — a regulator could verify any one of them against the live chain, but couldn't prove anything about the *order* in which they were issued. That is now fixed.
+
+`AuditChain.anchor_snapshot(anchor_dir=…)` now scans the anchor directory for the most recent existing anchor file and embeds its `anchor_id` as `prev_anchor_id` in the new snapshot. The anchor id formula becomes:
+
+```
+anchor_id = sha256(length || head || timestamp || prev_anchor_id)
+```
+
+The first anchor minted into a fresh directory uses `prev_anchor_id = GENESIS_HASH`. The published anchor stream therefore forms a *second* hash chain on top of the entry chain — anchors-of-anchors. Holding any single past anchor lets a third party verify the entire anchor history forward, not just one snapshot.
+
+**Backward compatibility.** `verify_anchor` checks for `prev_anchor_id` in the submitted doc; if absent it falls back to the original three-field formula so anchors minted in Appendix H–I still validate. This is exercised by `test_anchor_legacy_no_prev_field_still_verifies`.
+
+## J.2 Restart-safe quarantine state (partial close on §G.4 gap #2)
+
+`AgentQuarantine` now accepts a `storage_path` argument. The set of currently quarantined records is rewritten atomically (`tmp` → `os.replace`) on every state change and reloaded on construction. Wired through `api/routes/ai_breach.py` via `DRIFTGUARD_QUARANTINE_PATH` (default `backend/data/quarantine.json`).
+
+This closes the **single-worker portion** of §G.4 gap #2: a tripped circuit breaker no longer silently re-arms across a process restart. The rolling event buffer itself is intentionally not persisted — it's window-bounded and re-fills naturally from new traffic — but the *quarantine status* of an actor is durable.
+
+**What this does not yet close.** Cross-worker consistency still requires a shared store (Redis is the planned target). With more than one uvicorn worker, two workers can each independently observe sub-threshold risk that would have crossed the threshold in aggregate. This remains the only open §G.4 item.
+
+## J.3 New tests
+
+- `test_anchor_chain_links_prev_id` — first anchor is genesis-linked, second links to first; tampering with `prev_anchor_id` is caught.
+- `test_anchor_legacy_no_prev_field_still_verifies` — older anchors keep verifying.
+- `test_quarantine_persistence_round_trip` — record → restart → status persists; release → restart → cleared.
+
+Project test count: **137 → 140 passing**.
+
+## J.4 Source mapping (extends §I.5)
+
+| Claim in §J | Code reference |
+| --- | --- |
+| Linked anchor formula + dir scan | `backend/engine/ai_breach_governance.py::AuditChain.anchor_snapshot` and `_latest_anchor_id_in_dir` |
+| Backward-compatible verify | `backend/engine/ai_breach_governance.py::AuditChain.verify_anchor` |
+| Quarantine persistence | `backend/engine/ai_breach_governance.py::AgentQuarantine.__init__ / _load_from_disk / _persist` |
+| Wiring | `backend/api/routes/ai_breach.py` (`DRIFTGUARD_QUARANTINE_PATH`) |
+| Tests | `backend/tests/test_ai_breach_governance.py` |
+
+## J.5 §G.4 gap status
+
+| Gap | Status |
+| --- | --- |
+| #1 audit chain persistence | Closed (Appendix H). |
+| #2 quarantine consistency | **Single-worker** durability closed in this appendix. **Multi-worker** still requires Redis. |
+| #3 cryptographic anchoring | Closed (mint H, verify I), now further strengthened (linked chain J). |
+
+---
+
+*End of Appendix J — Linked anchor chain and restart-safe quarantine.*

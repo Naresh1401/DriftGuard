@@ -66,11 +66,17 @@ _ANCHOR_DIR = os.environ.get(
     "DRIFTGUARD_ANCHOR_DIR",
     str(__import__("pathlib").Path(__file__).resolve().parents[2] / "data" / "anchors"),
 )
+_QUARANTINE_PATH = os.environ.get(
+    "DRIFTGUARD_QUARANTINE_PATH",
+    str(__import__("pathlib").Path(__file__).resolve().parents[2] / "data" / "quarantine.json"),
+)
 _AUDIT_CHAIN = AuditChain(storage_path=_AUDIT_PATH)
 
 # Per-actor risk circuit breaker. Threshold tuned so that two Critical
 # detections (~70 each) inside the window will trip quarantine.
-_QUARANTINE = AgentQuarantine(threshold=120.0, window_minutes=60)
+_QUARANTINE = AgentQuarantine(
+    threshold=120.0, window_minutes=60, storage_path=_QUARANTINE_PATH
+)
 
 
 # ── Request / response schemas ───────────────────────

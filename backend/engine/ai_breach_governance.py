@@ -196,8 +196,17 @@ class AuditChain:
 
     def anchor_snapshot(self, *, anchor_dir: Optional[str] = None) -> Dict[str, Any]:
         """Produce a portable, signed-by-content snapshot of the current chain
-        head. The snapshot doc is `{length, head, timestamp, anchor_id}`
-        where `anchor_id = sha256(length || head || timestamp)`.
+        head. Anchors are themselves hash-linked: each new anchor embeds the
+        previous anchor's id, so the published anchor stream forms a second
+        tamper-evident chain. A regulator holding *any* past anchor can
+        verify the whole anchor history forward.
+
+        The snapshot doc is
+        ``{length, head, timestamp, prev_anchor_id, anchor_id}`` where
+        ``anchor_id = sha256(length || head || timestamp || prev_anchor_id)``.
+        For the very first anchor minted into a directory, ``prev_anchor_id``
+        is ``GENESIS_HASH``. Legacy anchors that omit ``prev_anchor_id`` are
+        still verifiable via the original formula (see ``verify_anchor``).
 
         If ``anchor_dir`` is provided, the snapshot is also written there as
         ``anchor-<anchor_id_prefix>.json``. External systems (S3 with
@@ -209,13 +218,17 @@ class AuditChain:
             length = len(self._entries)
             head = self._entries[-1].entry_hash if self._entries else GENESIS_HASH
         ts = datetime.now(timezone.utc).isoformat()
+        prev_anchor_id = GENESIS_HASH
+        if anchor_dir:
+            prev_anchor_id = self._latest_anchor_id_in_dir(anchor_dir) or GENESIS_HASH
         anchor_id = hashlib.sha256(
-            f"{length}|{head}|{ts}".encode("utf-8")
+            f"{length}|{head}|{ts}|{prev_anchor_id}".encode("utf-8")
         ).hexdigest()
         snapshot = {
             "length": length,
             "head": head,
             "timestamp": ts,
+            "prev_anchor_id": prev_anchor_id,
             "anchor_id": anchor_id,
         }
         if anchor_dir:
@@ -230,6 +243,30 @@ class AuditChain:
                 snapshot["write_error"] = str(exc)
         return snapshot
 
+    @staticmethod
+    def _latest_anchor_id_in_dir(anchor_dir: str) -> Optional[str]:
+        """Find the most recent anchor file in a directory and return its
+        ``anchor_id``. Used to chain a new anchor onto the previous one."""
+        try:
+            d = Path(anchor_dir)
+            if not d.exists():
+                return None
+            latest_ts = ""
+            latest_id: Optional[str] = None
+            for p in d.glob("anchor-*.json"):
+                try:
+                    raw = json.loads(p.read_text(encoding="utf-8"))
+                    ts = str(raw.get("timestamp", ""))
+                    aid = raw.get("anchor_id")
+                    if aid and ts > latest_ts:
+                        latest_ts = ts
+                        latest_id = str(aid)
+                except (OSError, ValueError, KeyError):
+                    continue
+            return latest_id
+        except OSError:
+            return None
+
     def verify_anchor(self, anchor: Dict[str, Any]) -> Dict[str, Any]:
         """Verify an external anchor doc against the live chain.
 
@@ -238,7 +275,10 @@ class AuditChain:
         storage:
 
         1. The anchor's own ``anchor_id`` is recomputable from its fields
-           (the snapshot wasn't edited after publication).
+           (the snapshot wasn't edited after publication). If the anchor
+           includes ``prev_anchor_id`` it is included in the recomputation;
+           otherwise the legacy 3-field formula is used so older anchors
+           still verify.
         2. The live chain still contains the entry at ``anchor.length`` and
            its hash matches ``anchor.head`` (the chain wasn't truncated or
            reorged below the anchor point).
@@ -252,9 +292,15 @@ class AuditChain:
         except (KeyError, TypeError, ValueError):
             return {"valid": False, "reason": "malformed anchor document"}
 
-        recomputed = hashlib.sha256(
-            f"{length}|{head}|{ts}".encode("utf-8")
-        ).hexdigest()
+        if "prev_anchor_id" in anchor:
+            prev_id = str(anchor["prev_anchor_id"])
+            recomputed = hashlib.sha256(
+                f"{length}|{head}|{ts}|{prev_id}".encode("utf-8")
+            ).hexdigest()
+        else:
+            recomputed = hashlib.sha256(
+                f"{length}|{head}|{ts}".encode("utf-8")
+            ).hexdigest()
         if recomputed != claimed_id:
             return {
                 "valid": False,
@@ -317,13 +363,23 @@ class QuarantineRecord:
 
 
 class AgentQuarantine:
-    """Track per-actor risk over a rolling window. Quarantine when over budget."""
+    """Track per-actor risk over a rolling window. Quarantine when over budget.
+
+    If ``storage_path`` is provided, the set of currently quarantined records
+    is persisted to a JSON file and reloaded on construction. The rolling
+    event buffer itself is intentionally not persisted — it's window-bounded
+    and would re-fill within ``window_minutes`` from new traffic — but the
+    *quarantine status* of an actor must survive a restart so a tripped
+    breaker does not silently re-arm. This closes the single-worker portion
+    of §G.4 gap #2; cross-worker consistency still requires Redis.
+    """
 
     def __init__(
         self,
         *,
         threshold: float = 150.0,
         window_minutes: int = 60,
+        storage_path: Optional[str] = None,
     ) -> None:
         if threshold <= 0:
             raise ValueError("threshold must be > 0")
@@ -335,6 +391,45 @@ class AgentQuarantine:
         # actor_id -> list[(timestamp, risk_score, pattern)]
         self._events: Dict[str, List[tuple]] = {}
         self._quarantined: Dict[str, QuarantineRecord] = {}
+        self._storage_path: Optional[Path] = (
+            Path(storage_path) if storage_path else None
+        )
+        if self._storage_path is not None:
+            self._storage_path.parent.mkdir(parents=True, exist_ok=True)
+            self._load_from_disk()
+
+    def _load_from_disk(self) -> None:
+        path = self._storage_path
+        if path is None or not path.exists():
+            return
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            for item in raw.get("quarantined", []):
+                self._quarantined[item["actor_id"]] = QuarantineRecord(
+                    actor_id=item["actor_id"],
+                    cumulative_risk=float(item["cumulative_risk"]),
+                    detections=int(item["detections"]),
+                    window_minutes=int(item["window_minutes"]),
+                    quarantined_at=datetime.fromisoformat(item["quarantined_at"]),
+                    reason=item["reason"],
+                    requires_human_review=bool(item.get("requires_human_review", True)),
+                )
+        except (OSError, ValueError, KeyError):
+            return
+
+    def _persist(self) -> None:
+        path = self._storage_path
+        if path is None:
+            return
+        try:
+            payload = {
+                "quarantined": [r.to_dict() for r in self._quarantined.values()],
+            }
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+            os.replace(tmp, path)
+        except OSError:
+            return
 
     def _prune(self, actor_id: str, now: datetime) -> None:
         cutoff = now - timedelta(minutes=self.window_minutes)
@@ -383,6 +478,7 @@ class AgentQuarantine:
                     ),
                 )
                 self._quarantined[actor] = rec
+                self._persist()
                 return rec
         return None
 
@@ -413,4 +509,6 @@ class AgentQuarantine:
             existed = actor_id in self._quarantined
             self._quarantined.pop(actor_id, None)
             self._events.pop(actor_id, None)
+            if existed:
+                self._persist()
             return existed

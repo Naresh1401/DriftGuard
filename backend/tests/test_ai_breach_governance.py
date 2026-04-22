@@ -209,3 +209,61 @@ def test_anchor_verify_genesis():
     assert snap["length"] == 0
     res = chain.verify_anchor(snap)
     assert res["valid"] is True
+
+
+def test_anchor_chain_links_prev_id(tmp_path):
+    chain = AuditChain()
+    chain.append({"event": "x"})
+    a1 = chain.anchor_snapshot(anchor_dir=str(tmp_path))
+    chain.append({"event": "y"})
+    a2 = chain.anchor_snapshot(anchor_dir=str(tmp_path))
+    # First anchor is genesis-linked, second links to first.
+    assert a1["prev_anchor_id"] == "0" * 64
+    assert a2["prev_anchor_id"] == a1["anchor_id"]
+    # Both verify against the live chain.
+    assert chain.verify_anchor(a1)["valid"] is True
+    assert chain.verify_anchor(a2)["valid"] is True
+    # Tampering with prev_anchor_id breaks self-consistency.
+    forged = dict(a2)
+    forged["prev_anchor_id"] = "1" * 64
+    assert chain.verify_anchor(forged)["valid"] is False
+
+
+def test_anchor_legacy_no_prev_field_still_verifies():
+    """Anchors minted before the chaining upgrade must still verify."""
+    import hashlib as _h
+    chain = AuditChain()
+    chain.append({"event": "x"})
+    length = len(chain)
+    head = chain.head()
+    ts = "2026-04-22T00:00:00+00:00"
+    legacy_id = _h.sha256(f"{length}|{head}|{ts}".encode()).hexdigest()
+    legacy = {"length": length, "head": head, "timestamp": ts, "anchor_id": legacy_id}
+    res = chain.verify_anchor(legacy)
+    assert res["valid"] is True
+
+
+def test_quarantine_persistence_round_trip(tmp_path):
+    path = tmp_path / "quar.json"
+    q1 = AgentQuarantine(threshold=10.0, window_minutes=5, storage_path=str(path))
+
+    class _D:
+        actor_id = "agent-42"
+        risk_score = 50.0
+        signal_ids = ["s1"]
+        pattern = None
+
+    rec = q1.record(_D())
+    assert rec is not None
+    assert rec.actor_id == "agent-42"
+
+    # Re-open: quarantine status survives restart.
+    q2 = AgentQuarantine(threshold=10.0, window_minutes=5, storage_path=str(path))
+    status = q2.status("agent-42")
+    assert status["quarantined"] is True
+    assert status["record"]["actor_id"] == "agent-42"
+
+    # Release persists too.
+    assert q2.release("agent-42") is True
+    q3 = AgentQuarantine(threshold=10.0, window_minutes=5, storage_path=str(path))
+    assert q3.status("agent-42")["quarantined"] is False
