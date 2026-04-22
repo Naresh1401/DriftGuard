@@ -108,6 +108,7 @@ export default function AIBreach() {
   const [audit, setAudit] = useState<{ length: number; head: string; intact: boolean } | null>(null)
   const [quarantine, setQuarantine] = useState<{ count: number; threshold: number; window_minutes: number } | null>(null)
   const [anchor, setAnchor] = useState<{ anchor_id: string; head: string; length: number; timestamp: string } | null>(null)
+  const [anchorVerify, setAnchorVerify] = useState<{ valid: boolean; reason: string; growth_since_anchor?: number } | null>(null)
   const [liveTick, setLiveTick] = useState<{ ts: string; forecast: { ewma: number | null; samples: number } } | null>(null)
 
   async function loadGovernance() {
@@ -126,7 +127,25 @@ export default function AIBreach() {
   async function createAnchor() {
     try {
       const r = await fetch(`${API_BASE}/ai-breach/audit/anchor`, { method: 'POST' })
-      if (r.ok) setAnchor(await r.json())
+      if (r.ok) {
+        const a = await r.json()
+        setAnchor(a)
+        setAnchorVerify(null)
+      }
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  async function verifyAnchor() {
+    if (!anchor) return
+    try {
+      const r = await fetch(`${API_BASE}/ai-breach/audit/anchor/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(anchor),
+      })
+      if (r.ok) setAnchorVerify(await r.json())
     } catch {
       /* best-effort */
     }
@@ -404,15 +423,31 @@ export default function AIBreach() {
               head: {audit.head.slice(0, 32)}…
             </div>
           )}
-          <button
-            onClick={createAnchor}
-            className="mt-3 text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-700"
-          >
-            Mint anchor snapshot
-          </button>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={createAnchor}
+              className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-700"
+            >
+              Mint anchor
+            </button>
+            <button
+              onClick={verifyAnchor}
+              disabled={!anchor}
+              className="text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 rounded-md text-slate-700"
+            >
+              Verify
+            </button>
+          </div>
           {anchor && (
             <div className="mt-2 text-[10px] font-mono text-emerald-700 truncate" title={anchor.anchor_id}>
               anchor: {anchor.anchor_id.slice(0, 24)}…
+            </div>
+          )}
+          {anchorVerify && (
+            <div className={`mt-1 text-[10px] ${anchorVerify.valid ? 'text-emerald-700' : 'text-rose-700'}`}>
+              {anchorVerify.valid
+                ? `verified · +${anchorVerify.growth_since_anchor ?? 0} entries since`
+                : `invalid · ${anchorVerify.reason}`}
             </div>
           )}
         </div>

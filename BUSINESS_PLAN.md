@@ -2101,3 +2101,70 @@ Only one of the three §G.4 gaps remains open after this appendix:
 ---
 
 *End of Appendix H — Persistence, anchor, live stream. Two of three §G.4 gaps closed; one remains and is named.*
+
+---
+
+# Appendix I — Anchor verification + history surface
+
+Appendix H added the ability to *mint* external tamper-evidence anchors. This appendix closes the loop by adding the ability to *verify* a previously-minted anchor against the live chain — the missing half that turns the mechanism from a one-way snapshot into a regulator-friendly proof system.
+
+## I.1 `verify_anchor` — the third audit primitive
+
+`AuditChain.verify_anchor(anchor_dict)` performs three independent checks and returns `{valid, reason, anchor_length, current_length, growth_since_anchor?}`:
+
+1. **Self-consistency.** Recompute `sha256(length|head|timestamp)` and compare to the snapshot's `anchor_id`. Catches any post-publication edit to the anchor doc.
+2. **Chain-presence.** Look up the entry at index `length-1` in the live chain. If `length` exceeds the current chain length, the chain has been truncated below the anchor point — `valid = False, reason = "chain truncated below anchor"`.
+3. **Hash equality.** The chain's entry hash at the anchor point must equal the anchor's `head`. Any reorg or rewrite of history below the anchor is detected here.
+
+The genesis anchor (`length = 0`) is a permitted special case: it verifies against `GENESIS_HASH` and proves the chain has never accepted an entry the anchor publisher didn't see.
+
+## I.2 New endpoints
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/v1/ai-breach/audit/anchor/verify` | Submit an anchor doc, get the verification result. |
+| `GET`  | `/api/v1/ai-breach/forecast/history?limit=N` | Read-only access to the recent risk-history buffer (capped at the forecaster's `max_history`, default 24h at 5-min cadence). Drives client-side sparklines / trend rendering without re-implementing the EWMA. |
+
+The verify endpoint is read-only: it never mutates the chain, never writes to disk, and accepts only a JSON body. It is safe to expose unauthenticated in the same posture the rest of the AI-breach surface already runs in.
+
+## I.3 Frontend surface
+
+The Audit Chain card on the AI Breach page now exposes both halves of the anchor primitive:
+
+- **Mint anchor** — calls `POST /audit/anchor`, displays the `anchor_id` prefix.
+- **Verify** — submits the most recently minted anchor back to `POST /audit/anchor/verify`, displays a green `verified · +N entries since` badge when the chain still extends from the anchor point, or a red `invalid · <reason>` badge otherwise.
+
+This makes the previously abstract guarantee — "you can prove the chain wasn't tampered with after the anchor was minted" — into a single click on the operator surface.
+
+## I.4 Test coverage
+
+Four new tests in `backend/tests/test_ai_breach_governance.py`:
+
+- `test_anchor_verify_against_live_chain` — happy path, verifies before and after chain growth.
+- `test_anchor_verify_detects_tampered_anchor` — flips `head`, expects the self-consistency check to catch it.
+- `test_anchor_verify_detects_truncation` — submits an anchor from a longer chain to a shorter one, expects `truncated`.
+- `test_anchor_verify_genesis` — empty-chain anchor verifies against an empty chain.
+
+Project test count: **133 → 137 passing**.
+
+## I.5 Source mapping (extends §H.5)
+
+| Claim in §I | Code reference |
+| --- | --- |
+| Three-check verification | `backend/engine/ai_breach_governance.py::AuditChain.verify_anchor` |
+| Verify endpoint | `backend/api/routes/ai_breach.py::audit_anchor_verify` |
+| History endpoint | `backend/api/routes/ai_breach.py::forecast_history` |
+| Mint + Verify buttons | `frontend/src/pages/AIBreach.tsx` |
+| Tests | `backend/tests/test_ai_breach_governance.py` |
+
+## I.6 Status of §G.4 honest gaps
+
+| Gap | Status |
+| --- | --- |
+| #1 audit chain persistence | Closed in Appendix H. |
+| #2 multi-worker quarantine consistency | Open — Redis migration scoped for next milestone. |
+| #3 cryptographic anchoring | Mint side closed in Appendix H; **verify side closed in Appendix I**. The full mint→publish→verify loop is now operational. |
+
+---
+
+*End of Appendix I — Anchor verification. Two of three §G.4 gaps fully closed end-to-end; only #2 (multi-worker quarantine) remains open and is named.*

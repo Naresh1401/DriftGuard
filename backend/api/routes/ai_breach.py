@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Body, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -430,6 +430,37 @@ async def audit_anchor() -> Dict[str, Any]:
     customer git repo, public timestamp service) can publish it for
     independent tamper-evidence beyond the in-process chain."""
     return _AUDIT_CHAIN.anchor_snapshot(anchor_dir=_ANCHOR_DIR)
+
+
+@router.post("/audit/anchor/verify")
+async def audit_anchor_verify(anchor: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
+    """Verify an externally-published anchor doc against the live chain.
+
+    Closes the loop on the anchor mechanism: a regulator, auditor, or the
+    customer themselves can submit a previously-minted snapshot and learn
+    whether the chain still extends from that point or has been truncated /
+    reorged. See ``AuditChain.verify_anchor`` for the three checks performed.
+    """
+    return _AUDIT_CHAIN.verify_anchor(anchor)
+
+
+@router.get("/forecast/history")
+async def forecast_history(limit: int = 288) -> Dict[str, Any]:
+    """Return the recent risk-history buffer for sparkline / trend rendering.
+
+    Stays bounded by the forecaster's own ``max_history`` (24h at 5-min
+    cadence by default). Read-only; no state mutation.
+    """
+    capped = max(1, min(int(limit), _FORECASTER.max_history))
+    history = _FORECASTER.history[-capped:]
+    return {
+        "samples": len(history),
+        "alpha": _FORECASTER.alpha,
+        "points": [
+            {"ts": ts.isoformat() if hasattr(ts, "isoformat") else str(ts), "risk": round(float(v), 1)}
+            for ts, v in history
+        ],
+    }
 
 
 # ── Real-time SSE risk stream ────────────────────────

@@ -230,6 +230,67 @@ class AuditChain:
                 snapshot["write_error"] = str(exc)
         return snapshot
 
+    def verify_anchor(self, anchor: Dict[str, Any]) -> Dict[str, Any]:
+        """Verify an external anchor doc against the live chain.
+
+        Returns ``{valid, reason, anchor_length, current_length}``. The check
+        proves three things to a regulator without trusting our clock or
+        storage:
+
+        1. The anchor's own ``anchor_id`` is recomputable from its fields
+           (the snapshot wasn't edited after publication).
+        2. The live chain still contains the entry at ``anchor.length`` and
+           its hash matches ``anchor.head`` (the chain wasn't truncated or
+           reorged below the anchor point).
+        3. The chain has only grown since (``current_length >= anchor.length``).
+        """
+        try:
+            length = int(anchor["length"])
+            head = str(anchor["head"])
+            ts = str(anchor["timestamp"])
+            claimed_id = str(anchor["anchor_id"])
+        except (KeyError, TypeError, ValueError):
+            return {"valid": False, "reason": "malformed anchor document"}
+
+        recomputed = hashlib.sha256(
+            f"{length}|{head}|{ts}".encode("utf-8")
+        ).hexdigest()
+        if recomputed != claimed_id:
+            return {
+                "valid": False,
+                "reason": "anchor_id does not match its own fields",
+                "anchor_length": length,
+            }
+
+        with self._lock:
+            current_length = len(self._entries)
+            if length == 0:
+                chain_head_at = GENESIS_HASH
+            elif length <= current_length:
+                chain_head_at = self._entries[length - 1].entry_hash
+            else:
+                return {
+                    "valid": False,
+                    "reason": "chain truncated below anchor",
+                    "anchor_length": length,
+                    "current_length": current_length,
+                }
+
+        if chain_head_at != head:
+            return {
+                "valid": False,
+                "reason": "chain head at anchor.length does not match anchor.head",
+                "anchor_length": length,
+                "current_length": current_length,
+            }
+        return {
+            "valid": True,
+            "reason": "anchor matches live chain",
+            "anchor_length": length,
+            "current_length": current_length,
+            "growth_since_anchor": current_length - length,
+        }
+
 
 # ── Agent quarantine / circuit breaker ───────────────
 

@@ -161,3 +161,51 @@ def test_anchor_snapshot_writes_file(tmp_path):
     assert len(files) == 1
     on_disk = files[0].read_text(encoding="utf-8")
     assert out["anchor_id"] in on_disk
+
+
+def test_anchor_verify_against_live_chain():
+    chain = AuditChain()
+    chain.append({"event": "alpha"})
+    chain.append({"event": "beta"})
+    snap = chain.anchor_snapshot()
+    res = chain.verify_anchor(snap)
+    assert res["valid"] is True
+    assert res["anchor_length"] == 2
+    assert res["current_length"] == 2
+    assert res["growth_since_anchor"] == 0
+    # Chain grows: anchor still verifies and growth is reflected.
+    chain.append({"event": "gamma"})
+    res2 = chain.verify_anchor(snap)
+    assert res2["valid"] is True
+    assert res2["growth_since_anchor"] == 1
+
+
+def test_anchor_verify_detects_tampered_anchor():
+    chain = AuditChain()
+    chain.append({"event": "x"})
+    snap = chain.anchor_snapshot()
+    forged = dict(snap)
+    forged["head"] = "f" * 64  # rewrite head, leave anchor_id alone
+    res = chain.verify_anchor(forged)
+    assert res["valid"] is False
+    assert "anchor_id" in res["reason"]
+
+
+def test_anchor_verify_detects_truncation():
+    chain_a = AuditChain()
+    chain_a.append({"event": "x"})
+    chain_a.append({"event": "y"})
+    snap = chain_a.anchor_snapshot()
+    # A different / truncated chain must fail verification.
+    chain_b = AuditChain()
+    res = chain_b.verify_anchor(snap)
+    assert res["valid"] is False
+    assert "truncated" in res["reason"].lower()
+
+
+def test_anchor_verify_genesis():
+    chain = AuditChain()
+    snap = chain.anchor_snapshot()
+    assert snap["length"] == 0
+    res = chain.verify_anchor(snap)
+    assert res["valid"] is True
