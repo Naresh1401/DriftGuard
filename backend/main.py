@@ -261,6 +261,20 @@ async def root():
 import os
 
 _frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+
+# Always-on: serve the embeddable browser collector script. Works in
+# both dev and prod so any embedding host can pull it from the API.
+_COLLECTOR_JS = Path(__file__).resolve().parent / "sdk" / "driftguard-collector.js"
+
+@app.get("/static/driftguard-collector.js", include_in_schema=False)
+async def serve_collector_js():
+    from fastapi.responses import FileResponse
+    return FileResponse(
+        str(_COLLECTOR_JS),
+        media_type="application/javascript",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
 if _frontend_dist.exists() and os.environ.get("ENVIRONMENT") == "production":
     from fastapi.staticfiles import StaticFiles
     from fastapi.responses import FileResponse

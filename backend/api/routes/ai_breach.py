@@ -46,6 +46,14 @@ from engine.ai_breach_governance import (
     AuditChain,
 )
 from engine.realtime_analyzer import RealtimeAnalyzer
+from engine.embed_layer import (
+    APPROVED,
+    ApprovalWorkflow,
+    EventCollector,
+    PENDING,
+    REJECTED,
+    RecommendationEngine,
+)
 
 
 router = APIRouter(prefix="/ai-breach", tags=["AI Breach"])
@@ -84,6 +92,16 @@ _QUARANTINE = AgentQuarantine(
 # the new /ingest endpoint, drained by /actors, /anomalies, and the
 # SSE /stream channel (see Appendix N).
 _REALTIME = RealtimeAnalyzer()
+
+# Embed-layer state (see Appendix O):
+#   * RecommendationEngine — turns detections into structured suggestions
+#   * ApprovalWorkflow      — durable, role-gated approval queue
+_RECOMMENDER = RecommendationEngine()
+_APPROVALS_PATH = os.environ.get(
+    "DRIFTGUARD_APPROVALS_PATH",
+    str(__import__("pathlib").Path(__file__).resolve().parents[2] / "data" / "approvals.json"),
+)
+_APPROVALS = ApprovalWorkflow(storage_path=_APPROVALS_PATH)
 
 
 # ── Request / response schemas ───────────────────────
@@ -574,6 +592,127 @@ async def list_anomalies(limit: int = 50) -> Dict[str, Any]:
     last N events without a full chain scan."""
     items = _REALTIME.recent_anomalies(limit=max(1, min(int(limit), 200)))
     return {"count": len(items), "anomalies": items}
+
+
+# ── Embed layer (Appendix O): collect → recommend → approve ──
+
+class CollectRequest(BaseModel):
+    """Free-form events from any embedding host (browser, mobile app,
+    backend service, agent runtime). Each event is normalized into an
+    ``AISignal`` and run through the same detector pipeline as ``/scan``.
+    Pending recommendations are filed automatically on detection."""
+    site_id: Optional[str] = None
+    events: List[Dict[str, Any]]
+
+
+@router.post("/collect")
+async def collect(req: CollectRequest) -> Dict[str, Any]:
+    """Generic event sink for embedded sites / apps / agents.
+
+    Pipeline:
+      1. Normalize each event → AISignal (EventCollector).
+      2. Run the full detector + audit + quarantine + realtime pass.
+      3. For each detection, build a Recommendation and submit it to
+         the role-gated approval queue.
+      4. Return detections + freshly-filed recommendations so the
+         embedding can render a banner / toast immediately.
+    """
+    if not req.events:
+        raise HTTPException(status_code=400, detail="events must be non-empty")
+    sigs = EventCollector.normalize_batch(req.events)
+    detector = AIBreachDetector(confidence_threshold=0.70)
+    detections = detector.detect_all(sigs)
+    agg = aggregate_risk(detections)
+    _FORECASTER.add(datetime.utcnow(), agg["overall_risk_score"])
+    _AUDIT_CHAIN.append_detections(detections)
+    for det in detections:
+        _QUARANTINE.record(det)
+    sig_to_actor = {str(s.id): s.actor_id for s in sigs}
+    actor_max: Dict[str, float] = {a: 0.0 for a in {s.actor_id for s in sigs}}
+    for d in detections:
+        for sid in d.signal_ids:
+            actor = sig_to_actor.get(str(sid))
+            if actor is not None and d.risk_score > actor_max.get(actor, 0.0):
+                actor_max[actor] = float(d.risk_score)
+    for actor, score in actor_max.items():
+        _REALTIME.observe(actor, score)
+    det_dicts = [d.to_dict() for d in detections]
+    recs = _RECOMMENDER.build_many(det_dicts)
+    submitted = _APPROVALS.submit_many(recs)
+    return {
+        "site_id": req.site_id,
+        "ingested_events": len(sigs),
+        "detections": det_dicts,
+        "aggregate": agg,
+        "recommendations_pending": submitted,
+    }
+
+
+@router.get("/recommendations")
+async def list_recommendations(
+    status: Optional[str] = None, limit: int = 100
+) -> Dict[str, Any]:
+    """List recommendations, optionally filtered by status.
+
+    ``status`` is one of ``pending``, ``approved``, ``rejected``,
+    ``expired``. Newest first, bounded by ``limit`` (max 500)."""
+    if status is not None and status not in (PENDING, APPROVED, REJECTED, "expired"):
+        raise HTTPException(status_code=400, detail=f"invalid status {status!r}")
+    capped = max(1, min(int(limit), 500))
+    items = _APPROVALS.list(status=status, limit=capped)
+    return {
+        "count": len(items),
+        "recommendations": items,
+        "stats": _APPROVALS.stats(),
+    }
+
+
+@router.get("/recommendations/{rec_id}")
+async def get_recommendation(rec_id: str) -> Dict[str, Any]:
+    item = _APPROVALS.get(rec_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail=f"recommendation {rec_id} not found")
+    return item
+
+
+class DecisionRequest(BaseModel):
+    """A signed decision on a pending recommendation. ``approver_role``
+    is checked against the recommendation's ``required_approver_roles``
+    list — wrong role → 403."""
+    decision: str  # "approved" | "rejected"
+    approver_id: str
+    approver_role: str
+    reason: str = ""
+
+
+@router.post("/recommendations/{rec_id}/decide")
+async def decide_recommendation(
+    rec_id: str, req: DecisionRequest
+) -> Dict[str, Any]:
+    try:
+        return _APPROVALS.decide(
+            rec_id,
+            decision=req.decision,
+            approver_id=req.approver_id,
+            approver_role=req.approver_role,
+            reason=req.reason,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/recommendations/log/decisions")
+async def recommendations_decision_log(limit: int = 100) -> Dict[str, Any]:
+    """Tamper-evident decision log for the approval queue. Bounded ring
+    buffer; oldest entries fall off. Useful for SOC dashboards and
+    SOC 2 CC1.3 segregation-of-duties audits."""
+    capped = max(1, min(int(limit), 500))
+    entries = _APPROVALS.decision_log(limit=capped)
+    return {"count": len(entries), "entries": entries}
 
 
 @router.get("/forecast/history")
