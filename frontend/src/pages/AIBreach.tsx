@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Bot, ShieldAlert, AlertTriangle, CheckCircle2, Loader2, Info, Zap, BookOpen, TrendingUp, Link2 } from 'lucide-react'
+import {
+  Bot,
+  ShieldAlert,
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  Info,
+  Zap,
+  BookOpen,
+  TrendingUp,
+  Link2,
+} from 'lucide-react'
 
 const API_BASE = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/$/, '')
 
@@ -58,7 +69,37 @@ interface Playbook {
 }
 
 interface ForecastPoint {
-  timestaplaybooks, setPlaybooks] = useState<Playbook[]>([])
+  timestamp: string
+  forecast: number
+  lower_bound: number
+  upper_bound: number
+}
+
+interface ForecastResponse {
+  samples: number
+  current_ewma: number
+  forecast: ForecastPoint[]
+  seeded?: boolean
+}
+
+const LEVEL_COLOR: Record<string, string> = {
+  Watch: 'bg-emerald-100 text-emerald-700 border-emerald-300',
+  Warning: 'bg-amber-100 text-amber-700 border-amber-300',
+  Critical: 'bg-rose-100 text-rose-700 border-rose-300',
+}
+
+const SEV_COLOR: Record<number, string> = {
+  1: 'bg-slate-100 text-slate-700',
+  2: 'bg-blue-100 text-blue-700',
+  3: 'bg-amber-100 text-amber-700',
+  4: 'bg-orange-100 text-orange-700',
+  5: 'bg-rose-100 text-rose-700',
+}
+
+export default function AIBreach() {
+  const [patterns, setPatterns] = useState<Pattern[]>([])
+  const [risk, setRisk] = useState<RiskResponse | null>(null)
+  const [playbooks, setPlaybooks] = useState<Playbook[]>([])
   const [forecast, setForecast] = useState<ForecastResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [scanning, setScanning] = useState(false)
@@ -69,9 +110,9 @@ interface ForecastPoint {
     setLoading(true)
     try {
       const [pr, pb, fc] = await Promise.all([
-        fetch(`${API_BASE}/ai-breach/patterns`).then(r => r.json()),
-        fetch(`${API_BASE}/ai-breach/playbooks`).then(r => r.json()),
-        fetch(`${API_BASE}/ai-breach/forecast`).then(r => r.json()),
+        fetch(`${API_BASE}/ai-breach/patterns`).then((r) => r.json()),
+        fetch(`${API_BASE}/ai-breach/playbooks`).then((r) => r.json()),
+        fetch(`${API_BASE}/ai-breach/forecast`).then((r) => r.json()),
       ])
       setPatterns(pr.patterns)
       setPlaybooks(pb.playbooks)
@@ -90,8 +131,7 @@ interface ForecastPoint {
       const r = await fetch(`${API_BASE}/ai-breach/demo`)
       if (!r.ok) throw new Error(`demo ${r.status}`)
       setRisk(await r.json())
-      // refresh forecast — the scan feeds the EWMA
-      const fc = await fetch(`${API_BASE}/ai-breach/forecast`).then(r => r.json())
+      const fc = await fetch(`${API_BASE}/ai-breach/forecast`).then((r) => r.json())
       setForecast(fc)
     } catch (e: any) {
       setError(e.message)
@@ -108,37 +148,7 @@ interface ForecastPoint {
   const playbookByPattern = playbooks.reduce<Record<string, Playbook>>((acc, p) => {
     acc[p.pattern] = p
     return acc
-  }, {}Loading(true)
-    try {
-      const r = await fetch(`${API_BASE}/ai-breach/patterns`)
-      if (!r.ok) throw new Error(`patterns ${r.status}`)
-      const d = await r.json()
-      setPatterns(d.patterns)
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function runDemoScan() {
-    setScanning(true)
-    setError(null)
-    try {
-      const r = await fetch(`${API_BASE}/ai-breach/demo`)
-      if (!r.ok) throw new Error(`demo ${r.status}`)
-      setRisk(await r.json())
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setScanning(false)
-    }
-  }
-
-  useEffect(() => {
-    loadPatterns()
-    runDemoScan()
-  }, [])
+  }, {})
 
   return (
     <div className="space-y-6">
@@ -153,8 +163,9 @@ interface ForecastPoint {
           </div>
           <p className="text-sm text-slate-600 mt-2 max-w-3xl">
             Heuristic, explainable detection across the seven AI-era breach classes mapped to
-            NIST AI RMF, OWASP LLM Top 10 (2025) and the UK NCSC December 2025 prompt-injection guidance.
-            DriftGuard audits AI behavior — it is not itself an opaque model.
+            NIST AI RMF, OWASP LLM Top 10 (2025), the UK NCSC December 2025 prompt-injection
+            guidance and MITRE ATLAS v4.7. DriftGuard audits AI behavior — it is not itself
+            an opaque model.
           </p>
         </div>
         <button
@@ -179,7 +190,9 @@ interface ForecastPoint {
           <div className="p-6 bg-white rounded-xl border border-slate-200 shadow-sm">
             <div className="text-xs uppercase tracking-wide text-slate-500">Overall AI Risk</div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-4xl font-bold text-slate-900">{risk.overall_risk_score.toFixed(0)}</span>
+              <span className="text-4xl font-bold text-slate-900">
+                {risk.overall_risk_score.toFixed(0)}
+              </span>
               <span className="text-sm text-slate-500">/ 100</span>
             </div>
             <div className="mt-3 h-2 w-full bg-slate-100 rounded-full overflow-hidden">
@@ -225,21 +238,28 @@ interface ForecastPoint {
       {/* Forecast strip */}
       {forecast && forecast.forecast.length > 0 && (
         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-violet-600" />
-              24-Hour AI Risk Forecast
-              <span className="text-xs font-normal text-slate-500">
-                (EWMA · {forecast.samples} samples · current {forecast.current_ewma.toFixed(0)})
-              </span>
-            </h2>
-          </div>
+          <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-3">
+            <TrendingUp className="w-4 h-4 text-violet-600" />
+            24-Hour AI Risk Forecast
+            <span className="text-xs font-normal text-slate-500">
+              (EWMA · {forecast.samples} samples · current {forecast.current_ewma.toFixed(0)})
+            </span>
+          </h2>
           <div className="flex items-end gap-1 h-24">
             {forecast.forecast.map((p, i) => {
               const h = Math.max(4, p.forecast)
-              const colour = p.forecast >= 70 ? 'bg-rose-400' : p.forecast >= 40 ? 'bg-amber-400' : 'bg-emerald-400'
+              const colour =
+                p.forecast >= 70
+                  ? 'bg-rose-400'
+                  : p.forecast >= 40
+                  ? 'bg-amber-400'
+                  : 'bg-emerald-400'
               return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1" title={`t+${i + 1}h: ${p.forecast} (${p.lower_bound}–${p.upper_bound})`}>
+                <div
+                  key={i}
+                  className="flex-1 flex flex-col items-center gap-1"
+                  title={`t+${i + 1}h: ${p.forecast} (${p.lower_bound}–${p.upper_bound})`}
+                >
                   <div className={`w-full rounded-t ${colour}`} style={{ height: `${h}%` }} />
                 </div>
               )
@@ -299,12 +319,14 @@ interface ForecastPoint {
                 </div>
                 {playbookByPattern[d.pattern] && (
                   <button
-                    onClick={() => setOpenPlaybook(openPlaybook === d.pattern ? null : d.pattern)}
+                    onClick={() =>
+                      setOpenPlaybook(openPlaybook === d.pattern ? null : d.pattern)
+                    }
                     className="mt-3 text-xs flex items-center gap-1 text-violet-700 hover:text-violet-900 font-semibold"
                   >
                     <BookOpen className="w-3 h-3" />
-                    {openPlaybook === d.pattern ? 'Hide' : 'Show'} mitigation playbook ·
-                    saves est. {playbookByPattern[d.pattern].expected_dwell_reduction_hours}h dwell
+                    {openPlaybook === d.pattern ? 'Hide' : 'Show'} mitigation playbook · saves
+                    est. {playbookByPattern[d.pattern].expected_dwell_reduction_hours}h dwell
                   </button>
                 )}
                 {openPlaybook === d.pattern && playbookByPattern[d.pattern] && (
@@ -376,8 +398,13 @@ function PlaybookView({ pb }: { pb: Playbook }) {
       <div className="flex items-center gap-2 flex-wrap text-xs">
         <Link2 className="w-3 h-3 text-violet-700" />
         <span className="font-semibold text-violet-900">MITRE ATLAS:</span>
-        {pb.mitre_atlas_ids.map(id => (
-          <span key={id} className="px-1.5 py-0.5 rounded bg-white border border-violet-300 font-mono text-violet-800">{id}</span>
+        {pb.mitre_atlas_ids.map((id) => (
+          <span
+            key={id}
+            className="px-1.5 py-0.5 rounded bg-white border border-violet-300 font-mono text-violet-800"
+          >
+            {id}
+          </span>
         ))}
       </div>
       <PlaybookSteps title="Immediate (0-1h)" steps={pb.immediate_steps} />
@@ -392,9 +419,11 @@ function PlaybookSteps({ title, steps }: { title: string; steps: PlaybookStep[] 
     <div>
       <div className="text-xs font-semibold text-violet-900 mb-1">{title}</div>
       <ol className="space-y-1">
-        {steps.map(s => (
+        {steps.map((s) => (
           <li key={s.order} className="text-xs text-slate-700 flex items-start gap-2">
-            <span className="w-4 h-4 rounded-full bg-violet-200 text-violet-900 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">{s.order}</span>
+            <span className="w-4 h-4 rounded-full bg-violet-200 text-violet-900 text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+              {s.order}
+            </span>
             <div className="flex-1">
               <div>{s.action}</div>
               <div className="text-[10px] text-slate-500 mt-0.5">
