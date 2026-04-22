@@ -267,3 +267,47 @@ def test_quarantine_persistence_round_trip(tmp_path):
     assert q2.release("agent-42") is True
     q3 = AgentQuarantine(threshold=10.0, window_minutes=5, storage_path=str(path))
     assert q3.status("agent-42")["quarantined"] is False
+
+
+def test_anchor_history_verifies_full_chain(tmp_path):
+    chain = AuditChain()
+    chain.append({"event": "a"})
+    chain.anchor_snapshot(anchor_dir=str(tmp_path))
+    chain.append({"event": "b"})
+    chain.anchor_snapshot(anchor_dir=str(tmp_path))
+    chain.append({"event": "c"})
+    chain.anchor_snapshot(anchor_dir=str(tmp_path))
+    res = chain.verify_anchor_history(str(tmp_path))
+    assert res["count"] == 3
+    assert res["valid"] is True
+    assert res["broken_at"] == -1
+    assert all(a["valid"] for a in res["anchors"])
+
+
+def test_anchor_history_detects_broken_link(tmp_path):
+    import json as _j
+    chain = AuditChain()
+    chain.append({"event": "a"})
+    chain.anchor_snapshot(anchor_dir=str(tmp_path))
+    chain.append({"event": "b"})
+    chain.anchor_snapshot(anchor_dir=str(tmp_path))
+    # Corrupt the second anchor's prev_anchor_id (and matching id) so the
+    # individual file is internally consistent but the linkage is broken.
+    files = sorted(tmp_path.glob("anchor-*.json"))
+    raw = _j.loads(files[1].read_text(encoding="utf-8"))
+    raw["prev_anchor_id"] = "1" * 64
+    import hashlib as _h
+    raw["anchor_id"] = _h.sha256(
+        f"{raw['length']}|{raw['head']}|{raw['timestamp']}|{raw['prev_anchor_id']}".encode()
+    ).hexdigest()
+    files[1].write_text(_j.dumps(raw), encoding="utf-8")
+    res = chain.verify_anchor_history(str(tmp_path))
+    assert res["valid"] is False
+    assert res["broken_at"] == 1
+    assert "prev_anchor_id" in res["reason"]
+
+
+def test_anchor_history_empty_dir(tmp_path):
+    chain = AuditChain()
+    res = chain.verify_anchor_history(str(tmp_path))
+    assert res == {"count": 0, "valid": True, "broken_at": -1, "anchors": []}

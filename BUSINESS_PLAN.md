@@ -2226,3 +2226,47 @@ Project test count: **137 → 140 passing**.
 ---
 
 *End of Appendix J — Linked anchor chain and restart-safe quarantine.*
+
+---
+
+# Appendix K — Full anchor-history verification
+
+Appendix J added the *linked* anchor chain (each anchor embeds the previous one's id). Appendix K closes that story by adding the ability to **walk and verify the entire anchor history in one shot**, so a regulator never has to verify anchors one at a time.
+
+## K.1 `verify_anchor_history(anchor_dir)`
+
+`AuditChain.verify_anchor_history` reads every `anchor-*.json` in the directory, sorts by timestamp, and proves three things across the whole set:
+
+1. **Per-anchor self-consistency.** Same check as `verify_anchor` — every anchor's `anchor_id` is recomputable from its own fields.
+2. **Linkage continuity.** Each anchor's `prev_anchor_id` matches the previous anchor's `anchor_id`. Pre-J.1 anchors that omit `prev_anchor_id` are tolerated and their linkage check is skipped, preserving backward compatibility.
+3. **Live-chain consistency.** Every anchor still verifies against the live entry chain (`verify_anchor` is invoked per anchor).
+
+Return shape: `{count, valid, broken_at, anchors: [{index, anchor_id, length, valid, ...}]}`. `broken_at` is the index of the first failing anchor (or `-1` if intact), so a regulator can see *exactly* which snapshot failed and why.
+
+## K.2 New endpoint
+
+`GET /api/v1/ai-breach/audit/anchors` — read-only walk of the anchor directory, returns the result of `verify_anchor_history`.
+
+## K.3 Tests
+
+- `test_anchor_history_verifies_full_chain` — three sequential anchors all verify and link.
+- `test_anchor_history_detects_broken_link` — surgically rewrites the second anchor's `prev_anchor_id` (and its `anchor_id` to keep self-consistency intact); expects `broken_at = 1` and a `prev_anchor_id` reason.
+- `test_anchor_history_empty_dir` — empty directory verifies trivially.
+
+Project test count: **140 → 143 passing**.
+
+## K.4 Source mapping (extends §J.4)
+
+| Claim in §K | Code reference |
+| --- | --- |
+| Full-history verification | `backend/engine/ai_breach_governance.py::AuditChain.verify_anchor_history` |
+| Endpoint | `backend/api/routes/ai_breach.py::audit_anchor_history` |
+| Tests | `backend/tests/test_ai_breach_governance.py` |
+
+## K.5 Why this matters
+
+Anchors are valuable only if they can be *audited*. With Appendix H–J a regulator could verify any one anchor against the live chain, and the linked chain proved that two adjacent anchors followed each other. Appendix K removes the manual step: a single GET returns a verifiable audit of the entire publication history. The mechanism now matches what regulators already expect from financial-grade transparency-log systems.
+
+---
+
+*End of Appendix K — Full anchor-history verification.*

@@ -450,6 +450,17 @@ async def audit_anchor_verify(anchor: Dict[str, Any] = Body(...)) -> Dict[str, A
     return _AUDIT_CHAIN.verify_anchor(anchor)
 
 
+@router.get("/audit/anchors")
+async def audit_anchor_history() -> Dict[str, Any]:
+    """Walk the anchor directory and verify the full anchors-of-anchors
+    chain in one shot. See ``AuditChain.verify_anchor_history`` — proves
+    each anchor is self-consistent, that the prev_anchor_id linkage is
+    unbroken, and that every anchor still verifies against the live entry
+    chain.
+    """
+    return _AUDIT_CHAIN.verify_anchor_history(_ANCHOR_DIR)
+
+
 @router.get("/forecast/history")
 async def forecast_history(limit: int = 288) -> Dict[str, Any]:
     """Return the recent risk-history buffer for sparkline / trend rendering.

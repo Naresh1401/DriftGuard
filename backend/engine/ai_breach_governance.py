@@ -337,6 +337,85 @@ class AuditChain:
             "growth_since_anchor": current_length - length,
         }
 
+    def verify_anchor_history(self, anchor_dir: str) -> Dict[str, Any]:
+        """Walk every anchor file in ``anchor_dir`` (sorted by timestamp) and
+        prove three things in one shot:
+
+        1. Each anchor's ``anchor_id`` is recomputable from its own fields
+           (no individual anchor was edited after publication).
+        2. Each anchor's ``prev_anchor_id`` matches the previous anchor's
+           ``anchor_id`` (the anchors-of-anchors chain is unbroken). Anchors
+           that pre-date the J.1 chaining upgrade are tolerated: they may
+           omit ``prev_anchor_id`` and the linkage check is skipped for them.
+        3. Each anchor still verifies against the live entry chain.
+
+        Returns ``{count, valid, broken_at, anchors:[…]}`` where ``broken_at``
+        is the index of the first failing anchor (or -1 if intact). The
+        ``anchors`` list is the per-anchor verification result so a regulator
+        can see *exactly* which snapshot failed and why.
+        """
+        d = Path(anchor_dir)
+        if not d.exists():
+            return {"count": 0, "valid": True, "broken_at": -1, "anchors": []}
+
+        loaded: List[Dict[str, Any]] = []
+        for p in sorted(d.glob("anchor-*.json")):
+            try:
+                loaded.append(json.loads(p.read_text(encoding="utf-8")))
+            except (OSError, ValueError):
+                return {
+                    "count": len(loaded),
+                    "valid": False,
+                    "broken_at": len(loaded),
+                    "reason": f"anchor file unreadable: {p.name}",
+                    "anchors": [],
+                }
+        loaded.sort(key=lambda a: str(a.get("timestamp", "")))
+
+        results: List[Dict[str, Any]] = []
+        prev_id: Optional[str] = None
+        for i, anchor in enumerate(loaded):
+            res = self.verify_anchor(anchor)
+            if not res["valid"]:
+                results.append({"index": i, "anchor_id": anchor.get("anchor_id"), **res})
+                return {
+                    "count": len(loaded),
+                    "valid": False,
+                    "broken_at": i,
+                    "reason": res["reason"],
+                    "anchors": results,
+                }
+            if "prev_anchor_id" in anchor and prev_id is not None:
+                expected = prev_id
+                if str(anchor["prev_anchor_id"]) != expected:
+                    results.append({
+                        "index": i,
+                        "anchor_id": anchor.get("anchor_id"),
+                        "valid": False,
+                        "reason": "prev_anchor_id does not match previous anchor",
+                    })
+                    return {
+                        "count": len(loaded),
+                        "valid": False,
+                        "broken_at": i,
+                        "reason": "prev_anchor_id does not match previous anchor",
+                        "anchors": results,
+                    }
+            results.append({
+                "index": i,
+                "anchor_id": anchor.get("anchor_id"),
+                "length": anchor.get("length"),
+                "valid": True,
+            })
+            prev_id = str(anchor.get("anchor_id"))
+
+        return {
+            "count": len(loaded),
+            "valid": True,
+            "broken_at": -1,
+            "anchors": results,
+        }
+
 
 # ── Agent quarantine / circuit breaker ───────────────
 
