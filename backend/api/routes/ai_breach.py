@@ -37,6 +37,10 @@ from engine.ai_breach_advanced import (
     HumanDriftEvent,
     RiskForecaster,
 )
+from engine.ai_breach_governance import (
+    AgentQuarantine,
+    AuditChain,
+)
 
 
 router = APIRouter(prefix="/ai-breach", tags=["AI Breach"])
@@ -45,6 +49,14 @@ router = APIRouter(prefix="/ai-breach", tags=["AI Breach"])
 # In a multi-worker deployment this would move to Redis; for the demo
 # and the current single-worker Render service this is sufficient.
 _FORECASTER = RiskForecaster()
+
+# Append-only audit chain of every detection produced via /scan.
+# Used by /audit/* endpoints to expose tamper-evident evidence to auditors.
+_AUDIT_CHAIN = AuditChain()
+
+# Per-actor risk circuit breaker. Threshold tuned so that two Critical
+# detections (~70 each) inside the window will trip quarantine.
+_QUARANTINE = AgentQuarantine(threshold=120.0, window_minutes=60)
 
 
 # ── Request / response schemas ───────────────────────
@@ -125,10 +137,24 @@ async def scan_signals(req: ScanRequest) -> Dict[str, Any]:
     detections = detector.detect_all(sigs)
     agg = aggregate_risk(detections)
     _FORECASTER.add(datetime.utcnow(), agg["overall_risk_score"])
+    # Append every detection to the tamper-evident chain and check for
+    # actors that just crossed the per-actor risk budget.
+    chain_entries = _AUDIT_CHAIN.append_detections(detections)
+    new_quarantines: List[Dict[str, Any]] = []
+    for det in detections:
+        rec = _QUARANTINE.record(det)
+        if rec is not None:
+            new_quarantines.append(rec.to_dict())
     return {
         "scanned_signals": len(sigs),
         "detections": [d.to_dict() for d in detections],
         "aggregate": agg,
+        "audit": {
+            "appended": len(chain_entries),
+            "head": _AUDIT_CHAIN.head(),
+            "length": len(_AUDIT_CHAIN),
+        },
+        "quarantines_triggered": new_quarantines,
     }
 
 
@@ -310,4 +336,71 @@ async def correlate_with_human_drift(req: CorrelateRequest) -> Dict[str, Any]:
         "human_events": len(human_events),
         "cross_findings": len(findings),
         "findings": [f.to_dict() for f in findings],
+    }
+
+
+# ── Governance: tamper-evident audit chain ───────────
+
+@router.get("/audit/chain")
+async def audit_chain(limit: int = 50) -> Dict[str, Any]:
+    """Return the most recent audit-chain entries (default last 50).
+
+    Each entry is hash-linked to the prior one; integrity can be verified
+    independently via /audit/verify.
+    """
+    if limit <= 0 or limit > 1000:
+        raise HTTPException(status_code=400, detail="limit must be in 1..1000")
+    entries = _AUDIT_CHAIN.entries(limit=limit)
+    return {
+        "length": len(_AUDIT_CHAIN),
+        "head": _AUDIT_CHAIN.head(),
+        "returned": len(entries),
+        "entries": [e.to_dict() for e in entries],
+    }
+
+
+@router.get("/audit/verify")
+async def audit_verify() -> Dict[str, Any]:
+    """Walk the chain and confirm every hash linkage is intact."""
+    return _AUDIT_CHAIN.verify()
+
+
+# ── Governance: agent quarantine / circuit breaker ───
+
+@router.get("/quarantine")
+async def quarantine_list() -> Dict[str, Any]:
+    """List every actor currently quarantined by the AI-breach circuit breaker."""
+    items = _QUARANTINE.list_quarantined()
+    return {
+        "count": len(items),
+        "threshold": _QUARANTINE.threshold,
+        "window_minutes": _QUARANTINE.window_minutes,
+        "quarantined": items,
+    }
+
+
+@router.get("/quarantine/{actor_id}")
+async def quarantine_status(actor_id: str) -> Dict[str, Any]:
+    return _QUARANTINE.status(actor_id)
+
+
+class ReleaseRequest(BaseModel):
+    reason: str = ""
+
+
+@router.post("/quarantine/{actor_id}/release")
+async def quarantine_release(actor_id: str, req: ReleaseRequest) -> Dict[str, Any]:
+    """Manually clear an actor's quarantine. The reason is logged to the
+    audit chain so the override itself is tamper-evident."""
+    existed = _QUARANTINE.release(actor_id)
+    entry = _AUDIT_CHAIN.append({
+        "event": "quarantine_release",
+        "actor_id": actor_id,
+        "reason": req.reason,
+        "had_record": existed,
+    })
+    return {
+        "released": existed,
+        "actor_id": actor_id,
+        "audit_entry_hash": entry.entry_hash,
     }

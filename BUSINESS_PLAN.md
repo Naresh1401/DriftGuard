@@ -1964,3 +1964,64 @@ The five vendor profiles in §F.4 do not introduce new numbered sources because 
 *End of Appendix F — AI-replacement breach mitigation and the AI-security competitor landscape. Three new cited sources, full mapping to live repository files, three honest gap items.*
 
 
+
+---
+
+# Appendix G — AI-breach governance layer (audit chain, circuit breaker, SDK)
+
+This appendix documents the three concrete additions that ship on top of Appendix F's seven AI-era breach patterns. Every item below corresponds to code that is in the live production deployment.
+
+## G.1 Tamper-evident audit chain
+
+`backend/engine/ai_breach_governance.py` exposes an `AuditChain` class. Every detection produced by `POST /api/v1/ai-breach/scan` is appended as `(prev_hash, payload_json) -> SHA-256` so any post-hoc edit to a logged detection is mechanically detectable. The endpoint `GET /api/v1/ai-breach/audit/verify` walks the chain and returns either `{intact: true}` or the first index where the hash linkage is broken.
+
+This addresses two compliance obligations directly:
+
+- NIST AI RMF [18] **GOVERN-1.4**: "decisions and their rationale are documented and traceable".
+- EU AI Act [11] **Article 12**: automatic logging of high-risk system events with integrity guarantees.
+
+The chain is process-local in the current single-worker Render deployment. Migration to the existing `PersistenceService` for multi-worker durability is a one-file change tracked in §G.4 below.
+
+## G.2 Agent circuit breaker (quarantine)
+
+`AgentQuarantine` maintains a per-actor rolling risk budget over a configurable window (default: 60 minutes, threshold: 120). When an actor's cumulative `risk_score` crosses the threshold, a `QuarantineRecord` is emitted with `requires_human_review = True`. The record is exposed via:
+
+- `GET /api/v1/ai-breach/quarantine` — list every currently quarantined actor.
+- `GET /api/v1/ai-breach/quarantine/{actor_id}` — per-actor status and remaining budget.
+- `POST /api/v1/ai-breach/quarantine/{actor_id}/release` — manual override; the override itself is appended to the audit chain so the release decision is also tamper-evident.
+
+Quarantine is **informational, never destructive** by design. Final disable / IAM revocation stays with the human-review gate, preserving the `confidence < 0.70 -> requires_human_review = True` invariant established in `models/__init__.py` and the GOVERN function of NIST AI RMF.
+
+## G.3 Stdlib SDK and CLI for external ingestion
+
+`backend/sdk/ai_breach_client.py` ships a zero-dependency `AIBreachClient` (Python urllib only) wrapping all seven `/ai-breach` endpoints plus `build_signal()` for ergonomic construction. `backend/sdk/ai_breach_cli.py` exposes the same surface as a shell-friendly CLI: `patterns | scan | risk | playbooks | playbook | forecast | correlate | demo`, with `--api-key` for Bearer auth and `--signals path.json` for batch input.
+
+The deliberate stdlib-only choice means external customers can ingest signals from any Python runtime (3.8+) without adding `requests`, `httpx` or any other dependency to their environment — material for regulated buyers in financial services and healthcare.
+
+## G.4 Honest gaps in this layer
+
+Three items are deliberately not yet in scope:
+
+1. **Persistence of the audit chain across worker restarts.** Currently the chain lives in process memory. Wiring it through `db/persistence.py` is required before any single-worker outage can be claimed as zero-data-loss for audit purposes.
+2. **Multi-worker quarantine consistency.** When DriftGuard runs more than one uvicorn worker the per-actor risk budgets diverge. Redis-backed counters resolve this and are scoped for the next milestone.
+3. **Cryptographic anchoring.** The current chain proves *internal* tamper-evidence. Anchoring the chain head to an external Merkle root (e.g. periodic publication into a customer-controlled S3 bucket with object-lock) is the next step before the strongest evidentiary claims can be made to a regulator.
+
+These three gaps are tracked publicly in this appendix to keep the no-hallucination discipline that the rest of the plan enforces.
+
+## G.5 Source mapping
+
+| Claim in §G | Code reference (live in `main` branch) |
+| --- | --- |
+| Hash-linked audit chain | `backend/engine/ai_breach_governance.py::AuditChain` |
+| Verify endpoint | `backend/api/routes/ai_breach.py::audit_verify` |
+| Agent circuit breaker | `backend/engine/ai_breach_governance.py::AgentQuarantine` |
+| Quarantine endpoints | `backend/api/routes/ai_breach.py::quarantine_list / quarantine_status / quarantine_release` |
+| Stdlib SDK | `backend/sdk/ai_breach_client.py` |
+| CLI wrapper | `backend/sdk/ai_breach_cli.py` |
+| Test coverage | `backend/tests/test_ai_breach_governance.py`, `backend/tests/test_ai_breach_sdk.py` |
+
+No new external sources are introduced by this appendix — the regulatory anchors [11] and [18] used here are already in the §14 master table.
+
+---
+
+*End of Appendix G — AI-breach governance layer. Three additive mechanisms (audit chain, circuit breaker, SDK), three honest gaps, full source-to-code mapping.*

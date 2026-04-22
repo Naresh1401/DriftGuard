@@ -1,0 +1,135 @@
+"""Tests for engine.ai_breach_governance — audit chain + agent quarantine."""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from uuid import uuid4
+
+import pytest
+
+from engine.ai_breach_governance import (
+    AgentQuarantine,
+    AuditChain,
+    GENESIS_HASH,
+    _canonical_json,
+    _hash,
+)
+from engine.ai_breach_detector import AIBreachDetection
+from core.ai_drift_patterns import AIBreachPatternType
+
+
+# ── Audit chain ──────────────────────────────────────
+
+def _det(actor_id: str, risk: float = 70.0, pattern=AIBreachPatternType.PROMPT_INJECTION):
+    """Build a minimal AIBreachDetection that exposes actor_id via signal_ids."""
+    d = AIBreachDetection(
+        pattern=pattern,
+        confidence=0.9,
+        severity=4,
+        risk_score=risk,
+        reasoning="test",
+        signal_ids=[uuid4()],
+    )
+    # Detector output doesn't carry actor_id directly; the quarantine
+    # falls back to "signal:<first_id>". Tag it via dict-like access in tests
+    # by monkey-patching an attribute.
+    d.actor_id = actor_id  # type: ignore[attr-defined]
+    return d
+
+
+def test_chain_starts_empty():
+    chain = AuditChain()
+    assert len(chain) == 0
+    assert chain.head() == GENESIS_HASH
+    v = chain.verify()
+    assert v == {"intact": True, "broken_at": -1, "length": 0, "head": GENESIS_HASH}
+
+
+def test_chain_append_links_correctly():
+    chain = AuditChain()
+    e1 = chain.append({"event": "first", "n": 1})
+    e2 = chain.append({"event": "second", "n": 2})
+    assert e1.index == 0 and e2.index == 1
+    assert e1.prev_hash == GENESIS_HASH
+    assert e2.prev_hash == e1.entry_hash
+    assert chain.head() == e2.entry_hash
+    assert len(chain) == 2
+
+
+def test_chain_verify_detects_tamper():
+    chain = AuditChain()
+    chain.append({"event": "a"})
+    e2 = chain.append({"event": "b"})
+    # Mutate payload after the fact.
+    e2.payload["event"] = "tampered"
+    v = chain.verify()
+    assert v["intact"] is False
+    assert v["broken_at"] == 1
+
+
+def test_chain_append_detections_uses_to_dict():
+    chain = AuditChain()
+    entries = chain.append_detections([_det("agent-1"), _det("agent-2")])
+    assert len(entries) == 2
+    assert chain.verify()["intact"] is True
+    # Payload should include the structured detection fields.
+    assert entries[0].payload["pattern"] == "Prompt_Injection"
+
+
+def test_canonical_json_is_stable():
+    a = {"b": 2, "a": 1, "c": [3, {"y": 5, "x": 4}]}
+    b = {"c": [3, {"x": 4, "y": 5}], "a": 1, "b": 2}
+    assert _canonical_json(a) == _canonical_json(b)
+    assert _hash(GENESIS_HASH, _canonical_json(a)) == _hash(GENESIS_HASH, _canonical_json(b))
+
+
+# ── Quarantine ───────────────────────────────────────
+
+def test_quarantine_validates_inputs():
+    with pytest.raises(ValueError):
+        AgentQuarantine(threshold=0)
+    with pytest.raises(ValueError):
+        AgentQuarantine(window_minutes=0)
+
+
+def test_quarantine_trips_on_threshold_cross():
+    q = AgentQuarantine(threshold=100.0, window_minutes=60)
+    # First detection: under threshold, no quarantine yet.
+    rec1 = q.record(_det("agent-A", risk=60))
+    assert rec1 is None
+    # Second detection pushes the actor over the budget.
+    rec2 = q.record(_det("agent-A", risk=50))
+    assert rec2 is not None
+    assert rec2.actor_id == "agent-A"
+    assert rec2.cumulative_risk >= 100.0
+    assert rec2.requires_human_review is True
+    # Subsequent calls do not produce a *new* record (already quarantined).
+    rec3 = q.record(_det("agent-A", risk=80))
+    assert rec3 is None
+    assert any(r["actor_id"] == "agent-A" for r in q.list_quarantined())
+
+
+def test_quarantine_status_and_release():
+    q = AgentQuarantine(threshold=50.0, window_minutes=60)
+    q.record(_det("svc-7", risk=60))
+    s = q.status("svc-7")
+    assert s["quarantined"] is True
+    assert s["record"]["actor_id"] == "svc-7"
+    assert q.release("svc-7") is True
+    s2 = q.status("svc-7")
+    assert s2["quarantined"] is False
+    # Releasing an unknown actor returns False without raising.
+    assert q.release("nobody") is False
+
+
+def test_quarantine_falls_back_to_signal_bucket_when_no_actor():
+    q = AgentQuarantine(threshold=30.0, window_minutes=60)
+    d = AIBreachDetection(
+        pattern=AIBreachPatternType.SHADOW_AI,
+        confidence=0.9,
+        severity=4,
+        risk_score=40.0,
+        signal_ids=[uuid4()],
+    )
+    rec = q.record(d)
+    assert rec is not None
+    assert rec.actor_id.startswith("signal:")

@@ -105,6 +105,21 @@ export default function AIBreach() {
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [openPlaybook, setOpenPlaybook] = useState<string | null>(null)
+  const [audit, setAudit] = useState<{ length: number; head: string; intact: boolean } | null>(null)
+  const [quarantine, setQuarantine] = useState<{ count: number; threshold: number; window_minutes: number } | null>(null)
+
+  async function loadGovernance() {
+    try {
+      const [v, q] = await Promise.all([
+        fetch(`${API_BASE}/ai-breach/audit/verify`).then((r) => r.json()),
+        fetch(`${API_BASE}/ai-breach/quarantine`).then((r) => r.json()),
+      ])
+      setAudit({ length: v.length, head: v.head, intact: v.intact })
+      setQuarantine({ count: q.count, threshold: q.threshold, window_minutes: q.window_minutes })
+    } catch {
+      /* governance is best-effort; silently ignore */
+    }
+  }
 
   async function loadAll() {
     setLoading(true)
@@ -143,6 +158,7 @@ export default function AIBreach() {
   useEffect(() => {
     loadAll()
     runDemoScan()
+    loadGovernance()
   }, [])
 
   const playbookByPattern = playbooks.reduce<Record<string, Playbook>>((acc, p) => {
@@ -344,6 +360,49 @@ export default function AIBreach() {
           No AI breach patterns detected in the last scan window.
         </div>
       )}
+
+      {/* Governance: tamper-evident audit chain + agent quarantine */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="text-xs uppercase tracking-wide text-slate-500">Tamper-Evident Audit Chain</div>
+            {audit && (
+              <span className={`text-xs px-2 py-0.5 rounded-full ${audit.intact ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                {audit.intact ? 'INTACT' : 'BROKEN'}
+              </span>
+            )}
+          </div>
+          <div className="mt-3 text-3xl font-bold text-slate-900">{audit?.length ?? 0}</div>
+          <div className="text-xs text-slate-500">hash-linked detections</div>
+          {audit && (
+            <div className="mt-2 text-[10px] font-mono text-slate-400 truncate" title={audit.head}>
+              head: {audit.head.slice(0, 32)}…
+            </div>
+          )}
+          <p className="mt-3 text-xs text-slate-600">
+            Every AI-breach detection is appended to a SHA-256 chain. Backs NIST AI RMF GOVERN-1.4
+            and the EU AI Act Art. 12 logging obligation for high-risk systems.
+          </p>
+        </div>
+        <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="text-xs uppercase tracking-wide text-slate-500">Agent Circuit Breaker</div>
+            {quarantine && (
+              <span className={`text-xs px-2 py-0.5 rounded-full ${quarantine.count > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                {quarantine.count} quarantined
+              </span>
+            )}
+          </div>
+          <div className="mt-3 text-3xl font-bold text-slate-900">{quarantine?.count ?? 0}</div>
+          <div className="text-xs text-slate-500">
+            {quarantine ? `threshold ${quarantine.threshold} risk / ${quarantine.window_minutes}m window` : 'rolling per-actor budget'}
+          </div>
+          <p className="mt-3 text-xs text-slate-600">
+            When an actor's cumulative AI-breach risk crosses the budget the circuit breaker trips
+            a structured kill-switch record. Action stays with the human-review gate by design.
+          </p>
+        </div>
+      </div>
 
       {/* Pattern catalogue */}
       <div className="space-y-3">
