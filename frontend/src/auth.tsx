@@ -71,6 +71,7 @@ export const NAV_ACCESS: Record<string, UserRole[]> = {
   '/reports':      ['admin', 'ciso', 'ni_architect', 'compliance_officer'],
   '/threat-intel': ['admin', 'ciso', 'ni_architect', 'compliance_officer', 'viewer'],
   '/scans':        ['admin', 'ciso', 'ni_architect'],
+  '/ai-breach':    ['admin', 'ciso', 'ni_architect', 'compliance_officer', 'viewer'],
 }
 
 /* ── Context ─────────────────────────────────────────── */

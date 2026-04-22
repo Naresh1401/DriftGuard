@@ -14,6 +14,7 @@ import DataCollection from './pages/DataCollection'
 import LiveScanner from './pages/LiveScanner'
 import ThreatIntel from './pages/ThreatIntel'
 import Scans from './pages/Scans'
+import AIBreach from './pages/AIBreach'
 import type { ReactNode } from 'react'
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="/reports" element={<Reports />} />
           <Route path="/threat-intel" element={<ThreatIntel />} />
           <Route path="/scans" element={<Scans />} />
+          <Route path="/ai-breach" element={<AIBreach />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

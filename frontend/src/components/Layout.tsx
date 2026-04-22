@@ -13,6 +13,7 @@ import {
   Radar,
   ShieldAlert,
   ScanSearch,
+  Bot,
   LogOut,
   Menu,
   X,
@@ -35,6 +36,7 @@ const NAV_ITEMS = [
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/threat-intel', label: 'Threat Intel', icon: ShieldAlert },
   { to: '/scans', label: 'Scans', icon: ScanSearch },
+  { to: '/ai-breach', label: 'AI Breach', icon: Bot },
 ]
 
 const ROLE_LABELS: Record<UserRole, string> = {
