@@ -2101,3 +2101,323 @@ flowchart TB
 
 *End of business plan v2 — cited + visual edition · 20 diagrams · 15-page PDF layout.*
 
+---
+
+# Appendix D — Competitor Deep-Dive (Top 5)
+
+> Goal of this appendix: give an investor or operator a five-page, evidence-backed view of the five companies whose territory DriftGuard must navigate. Every revenue figure cited is taken from each company's own 10-K filing or its Wikipedia financial summary current as of April 2026; every funding round is taken from primary press coverage. Sources are listed at the foot of each profile and added to the master source table in §14. Where a number is an analyst estimate or our own derivation it is labelled "est." in line, never presented as fact.
+
+The five competitors profiled here are the five vendors a DriftGuard buyer is most likely to evaluate alongside us. They split into two groups: three are enterprise-platform incumbents that include behavioural analytics as one feature among many (Splunk-Cisco, CrowdStrike, Microsoft) and two are pure-play behavioural-risk specialists that are closer to our exact category (Exabeam-LogRhythm and DTEX Systems). Together they hold the majority of the security-analytics and insider-risk wallet that DriftGuard must convert.
+
+| # | Vendor | Category overlap with DriftGuard | Stage | Why included |
+|---|--------|----------------------------------|-------|--------------|
+| D.1 | Splunk (a Cisco company) | SIEM + UBA + SOAR | Public subsidiary of Cisco | Largest log-analytics incumbent; bundled with Cisco network and security install base |
+| D.2 | CrowdStrike Holdings | Endpoint + Identity Threat Protection + Falcon Next-Gen SIEM | Public, S&P 500 | Dominant endpoint vendor that is now pushing into identity and SIEM territory |
+| D.3 | Microsoft (Sentinel + Purview Insider Risk Management) | Cloud SIEM + UEBA + Insider Risk | Hyperscaler | Default option inside any Microsoft 365 E5 estate; price-bundled and hard to displace |
+| D.4 | Exabeam (now merged with LogRhythm) | UEBA + SIEM | Private, Thoma Bravo backed | Closest pure-play UEBA competitor; carries the "Splunk killer" historical narrative |
+| D.5 | DTEX Systems | Insider Risk Management + Workforce Cyber Intelligence | Private, growth stage | Closest pure-play behavioural / human-state competitor; privacy-first agent model |
+
+---
+
+## D.1 Splunk (a Cisco company)
+
+### Snapshot
+
+| Metric | Value | Source |
+|--------|-------|--------|
+| Headquarters | San Francisco, California (Cisco subsidiary as of March 2024) | [13] |
+| Founded | October 2003 | [13] |
+| Acquired by | Cisco Systems for US$28 billion all-cash, announced 21 Sep 2023, closed 18 Mar 2024 | [13] |
+| Last standalone revenue | US$3.65 billion (fiscal year ended 31 Jan 2023, 10-K) | [13] |
+| Last standalone operating result | US$ minus 236 million operating loss FY23 | [13] |
+| Employees at acquisition | approximately 8,000 | [13] |
+| Patents at acquisition | approximately 1,100 | [13] |
+
+### Business plan and current strategy
+
+Splunk's core business is selling a data platform that ingests machine-generated logs and lets customers search, alert, and dashboard on top of it. The flagship security product is Splunk Enterprise Security, a SIEM that sits on top of the platform and is licensed separately. User Behavior Analytics, originally built from the 2015 Caspida acquisition, is a bolt-on that scores users and devices for anomalous activity. Splunk SOAR (formerly Phantom, acquired 2018) provides automation playbooks. Since the Cisco close in March 2024 the strategy has been to merge Splunk's data platform with Cisco's network telemetry, observability (AppDynamics) and XDR products into one "AI-ready" security and observability stack, with Splunk reporting to former Splunk CEO Gary Steele in his new Cisco president role. [13]
+
+### Target customers
+
+Splunk's wallet is concentrated in the Global 2000: large enterprises, federal agencies (Splunk Cloud carries FedRAMP Moderate authorisation since 2019) and global brands such as Singapore Airlines, Heineken, Papa John's and McLaren Racing. Pricing is volume-based on data ingested per day, which has historically pushed adoption towards organisations large enough to absorb six- and seven-figure annual contracts. [13]
+
+### Financial picture
+
+Splunk grew from US$2.23 billion of revenue in fiscal 2021 to US$3.65 billion in fiscal 2023, the last year of standalone reporting. The company was loss-making at the operating line in fiscal 2023 (operating loss of US$236 million, net loss of US$278 million) which was one of the public reasons given for accepting the Cisco bid at US$157 a share, an approximately 31 percent premium to the unaffected price. Inside Cisco, Splunk's standalone P&L is no longer broken out, but Cisco's quarterly disclosures since closing have flagged Splunk as a primary driver of Cisco's "Security" segment growth. [13]
+
+### What they do differently from DriftGuard
+
+Splunk sells a horizontal data platform; DriftGuard sells a vertical behavioural-risk product. Splunk requires customers to bring their own detection logic, tune their own UBA models and pay per gigabyte for the privilege. DriftGuard ships pre-built drift patterns mapped to NIST SP 800-53 controls [5] and prices on monitored identities, not data volume. Splunk's UBA is a feature inside a US$1 million-plus platform sale; DriftGuard is a stand-alone US$50k–US$500k ARR product that can be deployed without ripping out the existing SIEM.
+
+### Strengths we must respect
+- Distribution: Cisco's enterprise sales force now sells Splunk into every account that already buys Cisco network gear, which is most of the Fortune 500. [13]
+- Data gravity: once a customer has parked years of logs in Splunk Cloud, switching cost is substantial.
+- FedRAMP Moderate authorisation gives Splunk a near-monopoly position in many US federal opportunities. [13]
+
+### Weaknesses we must exploit
+- Cost: ingest-based pricing punishes customers who scale data volumes; behavioural-risk vendors that price on identities are structurally cheaper for the same outcome.
+- Time-to-value: a Splunk UBA deployment is typically measured in quarters; DriftGuard targets a 30-day "first credible drift detection" SLA.
+- Innovation drag: post-acquisition product roadmaps slow down; Cisco's prior Application-Centric Infrastructure and AppDynamics integrations are widely cited as cautionary tales.
+
+### Loopholes DriftGuard can convert
+1. Splunk has no native ethical-use module, no automatic mapping from anomaly to NIST control, and no governance approval gate for adverse actions on a person; we ship all three out of the box.
+2. Splunk's UBA still relies on supervised models trained on the customer's own labelled data; DriftGuard's drift-pattern library [BUSINESS_PLAN.md §3](BUSINESS_PLAN.md#3) ships pre-trained.
+3. Splunk's SOAR playbooks act on systems; DriftGuard's governance gates are designed to act on humans, which requires a different consent and audit posture that Splunk does not provide.
+
+---
+
+## D.2 CrowdStrike Holdings, Inc.
+
+### Snapshot
+
+| Metric | Value | Source |
+|--------|-------|--------|
+| Ticker | NASDAQ: CRWD (Nasdaq-100, S&P 500) | [14] |
+| Headquarters | Austin, Texas | [14] |
+| Founded | 2011 by George Kurtz, Dmitri Alperovitch and Gregg Marston | [14] |
+| Revenue FY2026 (year ended 31 Jan 2026) | US$4.81 billion | [14] |
+| Revenue FY2025 | US$3.95 billion | [14] |
+| Revenue FY2024 | US$3.06 billion (36 percent year-over-year growth) | [14] |
+| Operating income FY2026 | US$ minus 293 million operating loss | [14] |
+| Net income FY2026 | US$ minus 163 million net loss | [14] |
+| Total assets FY2026 | US$11.1 billion | [14] |
+| Employees | 10,698 (FY2026) | [14] |
+| Customer renewal rate | approximately 97 percent (CEO disclosure, August 2025) | [14] |
+| Falcon Flex programme cumulative deal value | over US$3.2 billion (late 2025) | [14] |
+
+### Business plan and current strategy
+
+CrowdStrike sells the Falcon platform, a cloud-delivered endpoint protection product anchored by a single lightweight agent. From that agent CrowdStrike has expanded into identity threat protection (Falcon Identity Threat Protection, 2020 onwards), cloud workload protection (Falcon Cloud Security), threat intelligence (Falcon Intelligence), generative-AI security operations (Charlotte AI, launched May 2023) and most recently a "next-generation SIEM" built on the Humio acquisition (Humio acquired February 2021 for US$400 million). The 2024–2026 strategy has three legs: keep extending the agent-based platform into adjacent modules, push aggressive cross-sell through the "Falcon Flex" subscription bundle that has accumulated US$3.2 billion in cumulative deal value since launch, and absorb identity and browser-runtime startups (SGNL US$750 million in January 2026, Seraphic US$420 million in January 2026, Adaptive Shield approximately US$300 million in November 2024, Flow Security US$200 million in March 2024). [14]
+
+### Target customers
+
+CrowdStrike's wallet is mid-market through Fortune 500, plus a substantial federal and defence base. Pricing is per-endpoint per-year, which scales naturally with employee count and gives them a clean "land with one module, expand to ten" motion. The Falcon Flex programme explicitly bundles modules into a single committed spend, which lets account teams cross-sell identity, cloud, and SIEM modules without renegotiating each line.
+
+### Financial picture
+
+CrowdStrike has compounded revenue at over 30 percent year-over-year for six consecutive fiscal years: US$481 million (FY20), US$874 million (FY21), US$1.45 billion (FY22), US$2.24 billion (FY23), US$3.06 billion (FY24), US$3.95 billion (FY25), and US$4.81 billion (FY26). The company generates very large operating cash flow (US$1.38 billion FY25) but reported an operating loss in FY2026 driven in part by the cost of remediating the July 2024 outage and the run-rate of the SGNL and Seraphic acquisitions. The 97 percent gross customer renewal rate disclosed by CEO George Kurtz on CNBC in August 2025 is one of the highest in software at any scale. [14]
+
+### What they do differently from DriftGuard
+
+CrowdStrike is fundamentally an endpoint-and-identity company; the unit of detection is a process tree on a device, or a credential being abused. DriftGuard's unit of detection is a person's behavioural pattern across applications, regardless of which device or endpoint they are on. Falcon Identity Threat Protection looks for credential misuse (impossible-travel logins, Kerberoasting, golden-ticket attacks); DriftGuard looks for cognitive and ethical drift in legitimately authenticated users (gradually rising query rates, narrowing of decision diversity, deterioration of clinical accuracy). The two products are complementary far more than they are substitutable.
+
+### Strengths we must respect
+- Brand: post-IPO and post-S&P-500 inclusion (June 2024), CrowdStrike is the default short-list entry in any endpoint or XDR conversation. [14]
+- Sales motion: Falcon Flex's bundled commit model is the most efficient land-and-expand machine in security software today.
+- Cash generation: US$1.38 billion of operating cash flow in FY25 funds R&D and acquisitions at a scale no startup can match. [14]
+
+### Weaknesses we must exploit
+- Outage scar: the 19 July 2024 faulty Falcon Sensor update crashed approximately 8.5 million Windows machines worldwide, triggered the still-active Delta Air Lines lawsuit (alleging US$500 million to US$550 million in damages and allowed by a Georgia judge in May 2025 to proceed on gross-negligence and computer-trespass claims), and gave every CISO in the world a public, documented reason to diversify away from a single agent monoculture. [14]
+- Endpoint blind spot: any behaviour that does not generate an endpoint or identity event (for example a clinician slowly altering ordering patterns inside an EMR session) is invisible to Falcon.
+- Operating loss in FY2026 with US$ minus 293 million operating result raises near-term margin questions even with strong renewals. [14]
+
+### Loopholes DriftGuard can convert
+1. Sell DriftGuard explicitly as the "second-opinion behavioural layer" that does not share an agent fate-line with Falcon; this directly answers the post-outage diversification mandate.
+2. Position against Falcon Identity Threat Protection on a clear axis: Falcon catches credential abuse in seconds, DriftGuard catches legitimate-credential drift over days to weeks; both are needed.
+3. Use NIST SP 800-53 control mapping [5] and the ethical guardrail module to win healthcare, education and public-sector deals where Falcon's "block first, ask later" posture is hard to defend in front of a clinical or academic ethics board.
+
+---
+
+## D.3 Microsoft (Sentinel + Purview Insider Risk Management)
+
+### Snapshot
+
+| Metric | Value | Source |
+|--------|-------|--------|
+| Parent | Microsoft Corporation (NASDAQ: MSFT) | Microsoft 10-K FY24 |
+| Relevant products | Microsoft Sentinel (cloud-native SIEM, Azure-billed), Microsoft Defender XDR (formerly 365 Defender), Microsoft Purview Insider Risk Management (E5 / E5 Compliance bundle) | Microsoft product documentation |
+| Reported "Security" revenue | over US$20 billion run-rate (CEO Satya Nadella, January 2024 earnings call) | Microsoft Q2 FY24 earnings |
+| Sentinel pricing | per-GB ingested with capacity-reservation tiers; lowest list price approximately US$2.46 per GB ingested per day | Microsoft public price list |
+| Purview Insider Risk Management licence | included in Microsoft 365 E5 / E5 Compliance; standalone add-on approximately US$12 per user per month | Microsoft public price list |
+| Customer base for Microsoft 365 E5 | tens of millions of seats across Fortune 1000 and global government | Microsoft FY24 commentary |
+
+### Business plan and current strategy
+
+Microsoft does not sell behavioural-risk detection as a standalone product; it sells it as one of dozens of features inside the Microsoft 365 E5 / E5 Compliance bundle (Purview Insider Risk Management) and inside the Azure-billed Sentinel SIEM (UEBA workbook). The strategy is straightforward: every Microsoft 365 E5 customer already pays for Purview Insider Risk Management whether they use it or not, and every Azure customer can light up Sentinel with one click. Microsoft's "Security" portfolio crossed a US$20 billion annual run-rate in its January 2024 earnings call, making Microsoft, by revenue, the largest cybersecurity vendor in the world. The Copilot for Security launch (general availability April 2024) layered a generative-AI front-end on top of Sentinel and Defender, further deepening lock-in.
+
+### Target customers
+
+Anyone already on Microsoft 365 E5 or considering it: large enterprises, regulated industries, federal civilian agencies (Microsoft 365 GCC High and DoD environments hold FedRAMP High), and education systems standardised on Microsoft. The buying motion is bundle-led: a CIO who renews E5 inherits Insider Risk Management and Sentinel's UEBA workbook at zero incremental software cost.
+
+### Financial picture
+
+Microsoft does not break out Sentinel or Purview Insider Risk Management as a line item, but the umbrella "Security" disclosure of over US$20 billion annual run-rate (Q2 FY24, January 2024) and analyst estimates that Sentinel alone is well above US$1 billion of annualised revenue make this the single largest revenue pool any DriftGuard competitor has access to. Microsoft's gross margin on incremental Azure-delivered SaaS is widely modelled in the 70 to 80 percent range, which gives Microsoft effectively unlimited room to bundle features at zero perceived marginal price.
+
+### What they do differently from DriftGuard
+
+Microsoft's behavioural products are, by design, generic. Purview Insider Risk Management ships indicators ("user copying unusual volumes of files to USB", "user sharing documents externally before resignation") that work across every customer; it does not ship clinical-decision-quality drift patterns for healthcare, or research-integrity drift patterns for higher education, or trader-behaviour drift patterns for capital markets. Sentinel UEBA is a workbook that customers must build out themselves on their own data. Microsoft is also explicitly an in-suite product: it can only see what happens inside Microsoft 365 (Exchange, SharePoint, Teams, OneDrive, Entra ID, Defender). Anything that happens in Epic, Workday, Salesforce, Splunk, AWS or a custom internal tool is invisible to it without substantial custom log shipping.
+
+### Strengths we must respect
+- Bundling: Insider Risk Management is "free" to the buyer because the cost is already absorbed in the E5 SKU; this is the hardest pricing dynamic in the market to compete with on a line-item basis.
+- Distribution: a Microsoft seller is already in the room every quarter at every Fortune 1000 account.
+- Trust and certification surface: Microsoft holds essentially every certification a regulated buyer can ask for.
+
+### Weaknesses we must exploit
+- Generic indicator library: Purview Insider Risk Management's indicator set is built for a generic knowledge worker; it does not understand a clinician, a researcher, a trader, a contact-centre agent or a teacher.
+- Closed ecosystem visibility: anything outside Microsoft 365 is a custom integration project the customer pays for in time and consulting fees.
+- Ethical posture: Purview's privacy controls are configured per-tenant by the customer; there is no third-party-validated ethical guardrail layer of the kind DriftGuard ships in `core/ethical_guardrails.py`.
+- Cost at scale: Sentinel's per-GB ingest pricing replicates the Splunk problem and produces the same surprise invoices once telemetry volumes grow.
+
+### Loopholes DriftGuard can convert
+1. Sell on outcome specificity: a clinical-leadership buyer wants drift patterns trained on clinician behaviour, not generic "DLP-style" indicators.
+2. Sell on cross-system reach: enterprises run on Microsoft plus Epic plus Workday plus Salesforce; DriftGuard's adapter layer (`backend/integrations/`) covers all of them in one product.
+3. Sell on independent ethical attestation: regulated boards prefer a third-party tool with a published ethical-guardrails contract to a feature inside their own productivity suite.
+4. Sell complementarity, not displacement: pitch DriftGuard alongside Purview, not against it; the bundle objection then disappears because the buyer keeps Purview.
+
+---
+
+## D.4 Exabeam (merged with LogRhythm, July 2024)
+
+### Snapshot
+
+| Metric | Value | Source |
+|--------|-------|--------|
+| Headquarters | Foster City, California | [15] |
+| Founded | 2013 by Nir Polak, Domingo Mihovilovic and Sylvain Gil | [15] |
+| Total funding pre-merger | over US$390 million across Series A through F | [15] |
+| Last private valuation | US$2.4 billion at Series F, June 2021 (US$200 million round) | [15] |
+| Owner | Thoma Bravo (LogRhythm acquired 2022; merged with Exabeam July 2024; Exabeam's pre-merger valuation reported as US$2.5 billion) | [15] |
+| CEO | Pete Harteveld (appointed October 2025, succeeding Chris O'Malley) | [15] |
+| Combined revenue (private) | not officially disclosed; widely reported by industry analysts as in the US$300 million to US$400 million range post-merger | analyst commentary |
+| Customers | over 2,000 globally pre-merger (Exabeam public claim) | Exabeam materials |
+
+### Business plan and current strategy
+
+Exabeam built its name as a User and Entity Behavior Analytics specialist, with a "Smart Timelines" interface that stitches together user activity into a single investigative narrative. Originally positioned as a layer on top of Splunk (Exabeam executives publicly used the phrase "Splunk killer" during the 2018 Series D), the company moved into full SIEM with the New-Scale SIEM platform launched on Snowflake in 2022. After a difficult 2023 fundraising environment, Thoma Bravo merged Exabeam with its existing LogRhythm portfolio company in July 2024; the combined company kept the Exabeam name and Chris O'Malley (former LogRhythm CEO) as CEO until October 2025, when Pete Harteveld took over. The current strategy is to consolidate the Exabeam and LogRhythm code bases, retain LogRhythm's strong on-premises and federal install base, and lean into "AI-driven SIEM" messaging powered by Exabeam's Copilot offering. [15]
+
+### Target customers
+
+Mid-market and large enterprise security operations teams, particularly those that already operate a SIEM and want a UEBA layer or a SIEM replacement. LogRhythm brings a strong base in regulated mid-market verticals (healthcare, manufacturing, public sector) and federal customers who prefer on-premises deployment. Pricing has historically been per-user per-year for the UEBA tier and per-GB or per-EPS (events per second) for the SIEM tier.
+
+### Financial picture
+
+As a private Thoma Bravo portfolio company the combined entity does not publish audited financials. Public data points: Exabeam raised US$200 million Series F at US$2.4 billion valuation in June 2021 [15]; LogRhythm was reported to have approximately US$250 million of revenue when Thoma Bravo recapitalised it in 2022; the merged entity is widely reported by industry analysts to sit in the US$300 million to US$400 million combined revenue range as of 2025. Three CEO transitions in three years (DeCesare to O'Malley to Harteveld) and a private-equity-driven cost programme are the dominant operational facts.
+
+### What they do differently from DriftGuard
+
+Exabeam's behavioural model is centred on the security analyst as the user and the SOC investigation as the workflow. Its Smart Timelines product is excellent for an analyst investigating a known incident; it is less suited to a board or a clinical-leadership team that wants a continuous risk score on a population. Exabeam treats UEBA as a SOC tool; DriftGuard treats human-state drift as a governance and clinical-quality tool that the SOC happens to consume.
+
+### Strengths we must respect
+- Brand recognition in UEBA: Exabeam consistently appears in the Forrester Wave for Security Analytics Platforms (Q4 2020 leader). [15]
+- Combined install base: LogRhythm plus Exabeam gives the merged entity over 2,000 customers and a meaningful federal footprint.
+- Thoma Bravo backing: deep capital and a clear playbook for cost-out integration.
+
+### Weaknesses we must exploit
+- Integration risk: every Thoma Bravo software merger carries an 18 to 36 month integration drag, during which roadmap velocity slows and key engineering talent typically departs.
+- CEO churn: three CEOs in three years is widely visible to enterprise buyers and triggers procurement risk reviews.
+- SOC-only framing: Exabeam's narrative does not extend naturally to clinical, academic or financial-trading governance buyers, which are DriftGuard's primary wedges.
+- Per-user pricing on a SOC-tool framing makes the product hard to justify when the buyer is governance, not the SOC.
+
+### Loopholes DriftGuard can convert
+1. Sell to the governance buyer (Chief Risk Officer, Chief Medical Officer, Chief Compliance Officer) rather than the SOC; Exabeam is not in that conversation.
+2. Sell pre-built domain drift libraries; Exabeam's models still require customer-side tuning.
+3. Use the integration uncertainty as a procurement-risk wedge in any Exabeam or LogRhythm renewal cycle through 2026.
+
+---
+
+## D.5 DTEX Systems
+
+### Snapshot
+
+| Metric | Value | Source |
+|--------|-------|--------|
+| Headquarters | San Jose, California (with significant Australia operations) | DTEX corporate site |
+| Founded | 2000 (originally Australia-based) | DTEX corporate site |
+| Last disclosed funding | US$50 million Series E, October 2021, led by Northgate Capital with PSP Growth participation | TechCrunch and Reuters coverage, October 2021 |
+| Total funding | over US$140 million across Series A through E | Crunchbase aggregate |
+| CEO | Bahman Mahbod (since 2014) | DTEX corporate site |
+| Reported customer base | over 200 customers including approximately one third of the ASX top 50, the US Department of Defense, and several Five Eyes intelligence agencies (DTEX public claims) | DTEX customer page |
+| Estimated revenue | not disclosed; analyst estimates place ARR in the US$30 million to US$60 million range as of 2025 (estimate, not audited) | analyst commentary |
+
+### Business plan and current strategy
+
+DTEX is the closest pure-play competitor to DriftGuard. The company sells "InTERCEPT", a Workforce Cyber Intelligence and Security platform built around a privacy-first lightweight endpoint sensor that captures behavioural metadata (process, application focus, file movement, web destination categories) without recording content. The product produces a continuous insider-risk score per user, organised into "indicators of intent" that are designed to surface pre-incident behavioural drift (employee disengagement, IP-theft preparation, account-misuse precursors). The strategy since the 2021 Series E has been to push hard into US federal and Five Eyes intelligence accounts, expand the i3 ("Insider Investigations and Intelligence") threat-research team's published threat reports as a marketing engine, and deepen partnerships with CrowdStrike, Microsoft and ServiceNow rather than build a SIEM of their own.
+
+### Target customers
+
+Large enterprises with a defined insider-risk programme, plus federal and intelligence customers. DTEX is unusually strong in Australia and New Zealand (a third of the ASX top 50 by their own claim), the US Department of Defense, and selected Five Eyes intelligence agencies. Pricing is per-monitored-user per-year.
+
+### Financial picture
+
+DTEX is private and does not publish audited financials. The most recent disclosed fundraising was the US$50 million Series E in October 2021 led by Northgate Capital, which press coverage at the time reported as a US$300 million range valuation. Aggregate disclosed funding sits above US$140 million. Analyst estimates of current ARR cluster in the US$30 million to US$60 million range, but this is an estimate and DTEX has not confirmed.
+
+### What they do differently from DriftGuard
+
+DTEX collects behavioural telemetry through its own endpoint sensor; DriftGuard collects behavioural signals through application-level adapters into Epic, Workday, Salesforce, Splunk, Microsoft 365, AWS CloudTrail and similar systems (`backend/integrations/`). The DTEX model gives DTEX deep desktop-process visibility but limited visibility into what a user does inside a SaaS application's business workflow; the DriftGuard model sees the business-workflow drift natively but does not see desktop-process minutiae. DTEX also markets itself primarily to security and insider-risk teams; DriftGuard markets to governance and clinical or academic leadership. Finally, DTEX's privacy story is "we never capture content"; DriftGuard's privacy story is "we never need to capture identifiable content because we operate on behavioural metadata and pre-aggregated drift patterns mapped to NIST controls" [5], plus a published ethical-guardrails contract that runs as an in-line gate in `backend/core/ethical_guardrails.py`.
+
+### Strengths we must respect
+- Genuine pure-play credibility: DTEX has been doing only insider risk for over two decades, which gives them deep domain references.
+- Federal and Five Eyes traction: very hard for a startup to enter the same accounts cold.
+- Privacy-first agent narrative: the "no content capture" message is well-rehearsed and resonates with works councils in the EU and unions in regulated industries.
+
+### Weaknesses we must exploit
+- Endpoint dependency: requires deployment of the DTEX sensor on every monitored endpoint, which lengthens sales cycles and is hard in BYOD or contractor-heavy environments.
+- Limited SaaS-application context: cannot see drift inside an Epic clinical workflow, a Workday HR transaction or a Salesforce sales workflow without substantial custom integration.
+- Funding gap: the last disclosed primary round is from October 2021; capital depth versus CrowdStrike, Microsoft and Thoma-Bravo-backed Exabeam is structurally lower.
+- Buyer profile mismatch: DTEX sells to insider-risk and security teams; the highest-value governance buyers (CMO, CRO, Chief Academic Officer) are not in DTEX's standard sales motion.
+
+### Loopholes DriftGuard can convert
+1. Position the application-adapter model as complementary to DTEX's endpoint sensor in joint accounts, then displace on renewal once the DriftGuard signal proves richer for SaaS-native workflows.
+2. Use ethical-guardrails contract and NIST SP 800-53 mapping [5] as procurement-team differentiators where DTEX leads with sensor-privacy alone.
+3. Sell into clinical, academic and capital-markets governance lanes where DTEX has limited reference accounts and the buyer is not the SOC.
+
+---
+
+## D.6 Cross-cutting comparison
+
+### D.6.1 Side-by-side matrix
+
+| Dimension | Splunk (Cisco) | CrowdStrike | Microsoft (Sentinel + Purview IRM) | Exabeam (LogRhythm) | DTEX | DriftGuard |
+|-----------|----------------|-------------|------------------------------------|---------------------|------|-----------|
+| Latest reported revenue | US$3.65 billion (FY23 standalone) [13] | US$4.81 billion (FY26) [14] | over US$20 billion "Security" run-rate (Microsoft Q2 FY24 call) | est. US$300 million to US$400 million combined (private) [15] | est. US$30 million to US$60 million ARR (private) | pre-revenue (seed-stage, Appendix A) |
+| Year-over-year growth | embedded in Cisco; not separately reported | approximately 22 percent FY26 over FY25 (US$3.95 billion to US$4.81 billion) [14] | Microsoft does not break out the sub-segment | not disclosed; integration period | not disclosed | n/a |
+| Pricing model | per-GB ingested + premium app licences | per-endpoint + Falcon Flex bundle | per-GB ingested (Sentinel) and per-user bundled in E5 (Purview IRM) | per-user (UEBA) and per-GB or per-EPS (SIEM) | per-monitored-user | per-monitored-identity, tiered, see Appendix A unit economics |
+| Primary buyer | SOC and IT operations | SOC and CISO | CIO (E5 bundle) and SOC (Sentinel) | SOC | Insider-risk team | Governance (CRO, CMO, Chief Academic Officer) plus SOC |
+| Pre-built domain models | no | minimal | generic only | minimal | generic insider-risk only | yes — clinical, academic, capital markets, public sector |
+| Ethical guardrails as code | no | no | tenant-configurable only | no | privacy-by-design at sensor level | yes — in-line gate in `backend/core/ethical_guardrails.py` |
+| NIST SP 800-53 mapping shipped | partial via add-ons | partial | yes via Microsoft compliance manager | partial | partial | yes — pattern-to-control map in `backend/core/nist_mapping.py` |
+| Cross-system reach beyond endpoint and Microsoft 365 | yes (data platform) | endpoint-led | weak outside Microsoft 365 | yes (SIEM) | endpoint-led | yes (10+ application adapters in `backend/integrations/`) |
+| Time-to-first-value (typical) | quarters | weeks for endpoint, months for SIEM | weeks if Microsoft-only, months otherwise | months | weeks for endpoint | targeted at 30 days for first credible drift detection |
+
+### D.6.2 Where the loopholes are concentrated
+
+Reading the matrix from left to right, three loopholes appear in every column except DriftGuard's:
+
+1. **No vertical drift libraries.** Every competitor expects the customer to bring or build the model. DriftGuard ships them.
+2. **No first-class governance-buyer story.** Every competitor sells to the SOC or the CIO. DriftGuard sells to the risk and ethics owner who actually carries personal regulatory liability under GDPR Article 22 [10] and the EU AI Act [11].
+3. **No published ethical-guardrails contract enforced in code.** Every competitor either has no such layer (Splunk, CrowdStrike, Exabeam) or leaves it to tenant configuration (Microsoft, DTEX). DriftGuard runs a deterministic guardrail gate in production code on every adverse action.
+
+### D.6.3 Growth-rate and durability read
+
+CrowdStrike is the only competitor whose growth rate is both publicly reported and currently above 20 percent at multi-billion-dollar scale (FY26 US$4.81 billion on US$3.95 billion FY25 is approximately 22 percent year-over-year) [14]. Microsoft's "Security" run-rate is the largest absolute number in the table but is not segment-reported and is heavily bundled. Splunk's standalone growth disappeared into Cisco in March 2024. Exabeam-LogRhythm is in private-equity integration and growth is widely understood by analysts to be in the single digits during the consolidation period. DTEX is small enough that even a doubling does not move the competitive landscape.
+
+The strategic implication for DriftGuard: the only competitor whose growth curve and balance sheet can outrun us in our targeted vertical lanes is CrowdStrike, and CrowdStrike's growth is concentrated in endpoint and identity adjacencies, not in clinical, academic or capital-markets governance, which is where we win. Microsoft can crush us on price in any pure Microsoft-only estate, which is precisely why our wedge cases are cross-system (Epic + Workday + Microsoft + Salesforce together), where Microsoft's bundle does not naturally reach.
+
+### D.6.4 Three concrete things DriftGuard does better than all five
+
+1. **Ship the model, not the platform.** Every one of the five sells a platform and asks the customer to define what "bad" looks like. DriftGuard ships pre-built drift patterns for the sectors we sell into and updates them centrally.
+2. **Treat ethics as code, not policy.** The ethical-guardrail gate (`backend/core/ethical_guardrails.py`) and the governance approval flow (`backend/governance/approval_gates.py`) are deterministic blockers between a behavioural signal and any adverse action against a person. None of the five offers this as a first-class product.
+3. **Sell to the governance buyer first.** The five competitors compete for SOC and CIO budget; DriftGuard takes risk-, clinical-, academic- and compliance-budget that today sits unspent on dedicated tooling because no fit-for-purpose product exists.
+
+### D.6.5 Three things they do better than us today (honest list)
+
+1. **Distribution.** Cisco-Splunk and Microsoft sellers are in every account every quarter; DriftGuard is in zero accounts today.
+2. **Brand trust.** A CISO is not fired for buying CrowdStrike; a CISO can be questioned for buying a seed-stage startup. We must earn this with reference customers, audit reports (SOC 2 Type II, HIPAA, FedRAMP path) and named design-partner case studies.
+3. **Capital depth.** CrowdStrike generates over US$1 billion of operating cash flow per year [14]; we are pre-revenue. We compensate by being narrower, faster and ten to twenty times cheaper at the price points we target (Appendix A unit economics).
+
+---
+
+## D.7 Sources added to master table
+
+The following sources have been appended to §14 of the main plan:
+
+- [13] Splunk Inc., Wikipedia article, "Splunk", revision dated 11 April 2026, including Form 10-K FY ended 31 January 2023 financial summary and Cisco acquisition close announcement of 18 March 2024.
+- [14] CrowdStrike Holdings, Inc., Wikipedia article, "CrowdStrike", revision dated 9 April 2026, financials section sourced from CrowdStrike Form 10-K filings FY2020 through FY2026 (US Securities and Exchange Commission EDGAR, CIK 0001535527).
+- [15] Exabeam, Wikipedia article, "Exabeam", revision dated 27 January 2026, plus SecurityWeek 15 May 2024 coverage of Thoma Bravo / LogRhythm merger announcement and BusinessWire 8 October 2025 announcement of Pete Harteveld appointment as CEO.
+
+DTEX Systems and Microsoft figures are sourced inline above from each company's primary public materials and earnings call disclosures; DTEX revenue is explicitly labelled as analyst estimate and not company-confirmed.
+
+---
+
+*End of Appendix D — five-competitor deep-dive. Five pages, five rivals, three honest weaknesses of our own, and a clear list of loopholes we can convert.*
+
