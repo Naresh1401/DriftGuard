@@ -1146,23 +1146,25 @@ quadrantChart
 
 ```mermaid
 quadrantChart
-    title Risk register — likelihood × impact (from §12)
+    title Risk register - likelihood vs impact (from section 12)
     x-axis "Low likelihood" --> "High likelihood"
     y-axis "Low impact" --> "High impact"
-    quadrant-1 "Watch closely"
-    quadrant-2 "Mitigate now"
+    quadrant-1 "Mitigate now"
+    quadrant-2 "Plan for"
     quadrant-3 "Monitor"
-    quadrant-4 "Plan for"
-    "False positive trust": [0.80, 0.85]
-    "Large SIEM clones feature": [0.55, 0.85]
-    "Legal pushback": [0.45, 0.85]
-    "Customer churn no breach": [0.55, 0.55]
-    "Model accuracy new domains": [0.55, 0.55]
-    "ML hiring difficulty": [0.80, 0.55]
-    "Tight fundraising": [0.55, 0.55]
-    "Founder bandwidth": [0.65, 0.65]
-    "FedRAMP delay": [0.50, 0.45]
+    quadrant-4 "Watch closely"
+    "False positives": [0.78, 0.88]
+    "SIEM clones feature": [0.58, 0.82]
+    "Legal pushback": [0.42, 0.78]
+    "Founder bandwidth": [0.70, 0.70]
+    "ML hiring": [0.82, 0.58]
+    "Churn no breach": [0.50, 0.62]
+    "Model accuracy": [0.62, 0.50]
+    "Tight fundraising": [0.45, 0.55]
+    "FedRAMP delay": [0.35, 0.42]
 ```
+
+> Read: top-right "Mitigate now" = high likelihood + high impact (false positives, SIEM clones, founder bandwidth). Bottom-left "Monitor" = low/low (FedRAMP delay).
 
 ### C.17 KPI Control Plane
 
