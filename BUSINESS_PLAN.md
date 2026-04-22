@@ -2369,3 +2369,62 @@ A regulator can now choose the granularity that matches their question: "show me
 ---
 
 *End of Appendix M — Per-entry receipts.*
+
+---
+
+## Appendix N — Real-time per-actor anomaly layer
+
+Where Appendix L gave operators a "verify-all" button and Appendix M gave them a per-entry receipt, **Appendix N introduces the streaming layer that watches risk *move* per actor in real time**. It is implemented end-to-end in this commit and runs on real data through the same `/scan` path that already feeds the audit chain.
+
+### N.1 What changed
+
+1. **`backend/engine/realtime_analyzer.py`** — new module. A thread-safe, stdlib-only `RealtimeAnalyzer` that keeps a per-actor rolling window of `(timestamp, risk_score)` samples (default window=50, TTL=60min) and computes a z-score against a baseline of at least 8 prior points. Samples whose `|z| ≥ 2.5` (≈99% of normal traffic) are flagged as anomalies and pushed onto a bounded global ring buffer (default cap 200). Memory bounds are explicit; no file I/O; multi-worker correctness is an explicit non-goal (mirrors the existing `RiskForecaster` and `AgentQuarantine` posture — see Appendix J).
+2. **`backend/api/routes/ai_breach.py`** — wired up:
+   - `POST /api/v1/ai-breach/scan` now also feeds the analyzer with the highest risk attributed to each actor's signals in the batch and returns a `realtime` block listing any anomalies fired by the call.
+   - `POST /api/v1/ai-breach/ingest` — new. Accepts a single `{actor_id, risk_score, timestamp?}` sample for systems that already produce risk scores upstream (a SOC pipeline, a sidecar, an SDK). Returns the z-score verdict.
+   - `GET /api/v1/ai-breach/actors` — snapshot table of every tracked actor with latest risk + baseline mean/stdev, sorted desc.
+   - `GET /api/v1/ai-breach/actors/{actor_id}/trajectory` — full rolling-window trajectory + baseline for one actor (404 if no samples).
+   - `GET /api/v1/ai-breach/anomalies?limit=N` — most recent z-score anomalies, bounded ring buffer.
+   - `GET /api/v1/ai-breach/stream` — extended. The existing `tick` event now carries a `realtime` stats block, and the channel pushes a separate `event: anomaly` frame per new anomaly observed since the last tick. Replay-on-reconnect is provided by `/anomalies`.
+3. **`backend/tests/test_realtime_analyzer.py`** — 9 new tests: warmup, spike-on-baseline, isolation per actor, trajectory & snapshot, ring-buffer cap, TTL eviction, plus end-to-end `TestClient` coverage of `/ingest`, `/actors/{id}/trajectory`, `/anomalies`, and the `realtime` block on `/scan`.
+
+### N.2 Why this matters
+
+A burst of medium-severity detections from one actor can sit *below* the per-call risk gate but represent exactly the kind of behavioural drift NIST AI RMF MEASURE-2.7 and GOVERN-1.5 expect to be continuously monitored. Until Appendix N, DriftGuard would record each detection in the chain (App. H) and trip quarantine if the 60-min sum exceeded 120 (App. J), but it had no streaming view of *trajectory*. Now it does — and crucially, the same anomalies feed the SSE channel, so any subscriber (the operator UI, a SOC ticker, a NOC display) sees the event without polling.
+
+### N.3 Verification (smoke against running backend, 2026-04-22)
+
+```bash
+# Warm up baseline (10 samples around 10.0)
+for s in 10 11 9.5 10.5 10.2 9.8 10.1 9.9 10.3 10; do
+  curl -sf -X POST http://localhost:8000/api/v1/ai-breach/ingest \
+    -H 'Content-Type: application/json' \
+    -d "{\"actor_id\":\"smoke-actor\",\"risk_score\":$s}" > /dev/null
+done
+
+# Spike to 92 — produces verdict:
+{
+  "actor_id": "smoke-actor", "risk_score": 92.0, "samples": 11,
+  "baseline_ready": true, "baseline_mean": 10.13, "baseline_stdev": 0.39,
+  "z": 209.923, "anomaly": true,
+  "reason": "|z|=209.92 >= 2.5 (mu=10.1, sigma=0.4)"
+}
+
+# /actors → count=1 top=smoke-actor@92.0
+# /anomalies?limit=3 → 1 entry, smoke-actor, |z|≈210
+# /stream first frames →
+#   event: hello   data: {... "realtime": {"actors_tracked":1, "anomalies_buffered":1, ...}}
+#   event: tick    data: {... "realtime": {...}}
+```
+
+Test suite: **156 / 156 passing** (was 147 → +9 in this appendix).
+
+### N.4 Honest limits
+
+- Single-process state. Under multi-worker uvicorn, each worker has its own analyzer; the SSE channel only sees anomalies from the worker that handled the ingest. The existing single-worker Render service avoids this; Appendix J tracks the Redis migration that would fix it for both quarantine and the analyzer in one step.
+- No persistence. Process restart drops the rolling windows. By design — the audit chain is the system of record; the analyzer is operational telemetry.
+- Z-score assumes roughly stationary actor behaviour over the TTL window. A legitimate phase change (new tool rollout, new playbook) will produce one transient anomaly per affected actor. Treated as a feature, not a bug — the verdict carries `reason` so an operator can dismiss it.
+
+---
+
+*End of Appendix N — Real-time per-actor anomaly layer.*

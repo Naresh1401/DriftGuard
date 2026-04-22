@@ -45,6 +45,7 @@ from engine.ai_breach_governance import (
     AgentQuarantine,
     AuditChain,
 )
+from engine.realtime_analyzer import RealtimeAnalyzer
 
 
 router = APIRouter(prefix="/ai-breach", tags=["AI Breach"])
@@ -77,6 +78,12 @@ _AUDIT_CHAIN = AuditChain(storage_path=_AUDIT_PATH)
 _QUARANTINE = AgentQuarantine(
     threshold=120.0, window_minutes=60, storage_path=_QUARANTINE_PATH
 )
+
+# Real-time per-actor risk trajectory + z-score anomaly detector.
+# Stateful across requests within a single process. Fed by /scan and
+# the new /ingest endpoint, drained by /actors, /anomalies, and the
+# SSE /stream channel (see Appendix N).
+_REALTIME = RealtimeAnalyzer()
 
 
 # ── Request / response schemas ───────────────────────
@@ -165,6 +172,21 @@ async def scan_signals(req: ScanRequest) -> Dict[str, Any]:
         rec = _QUARANTINE.record(det)
         if rec is not None:
             new_quarantines.append(rec.to_dict())
+    # Real-time per-actor trajectory: for every actor in the batch, score
+    # the highest detection risk attributed to one of their signals (0.0
+    # if no detection fired). The verdict is appended to the rolling
+    # anomaly buffer so SSE subscribers see live z-score events.
+    sig_to_actor = {str(s.id): s.actor_id for s in sigs}
+    actor_max: Dict[str, float] = {a: 0.0 for a in {s.actor_id for s in sigs}}
+    for d in detections:
+        for sid in d.signal_ids:
+            actor = sig_to_actor.get(str(sid))
+            if actor is not None and d.risk_score > actor_max.get(actor, 0.0):
+                actor_max[actor] = float(d.risk_score)
+    realtime_verdicts = [
+        _REALTIME.observe(actor, score) for actor, score in actor_max.items()
+    ]
+    new_anomalies = [v for v in realtime_verdicts if v.get("anomaly")]
     return {
         "scanned_signals": len(sigs),
         "detections": [d.to_dict() for d in detections],
@@ -175,6 +197,10 @@ async def scan_signals(req: ScanRequest) -> Dict[str, Any]:
             "length": len(_AUDIT_CHAIN),
         },
         "quarantines_triggered": new_quarantines,
+        "realtime": {
+            "actors_observed": len(actor_max),
+            "anomalies_triggered": new_anomalies,
+        },
     }
 
 
@@ -490,6 +516,66 @@ async def audit_entry_verify(entry: Dict[str, Any] = Body(...)) -> Dict[str, Any
     return _AUDIT_CHAIN.verify_entry_receipt(entry)
 
 
+# ── Real-time per-actor analytics (Appendix N) ───────
+
+class IngestRequest(BaseModel):
+    """Lightweight per-actor risk sample for systems that have already
+    computed a score upstream (a SOC pipeline, a sidecar, an SDK)."""
+    actor_id: str
+    risk_score: float
+    timestamp: Optional[datetime] = None
+
+
+@router.post("/ingest")
+async def ingest_realtime(req: IngestRequest) -> Dict[str, Any]:
+    """Feed a single (actor, risk_score) sample into the realtime analyzer.
+
+    Returns the z-score verdict for this sample. Anomalous samples
+    (``|z| >= z_threshold``) are appended to the rolling anomaly buffer
+    and broadcast on the SSE ``/stream`` channel. Use this when your
+    upstream already produces risk scores and you only need the
+    streaming anomaly layer.
+    """
+    return _REALTIME.observe(
+        req.actor_id, req.risk_score, timestamp=req.timestamp
+    )
+
+
+@router.get("/actors")
+async def list_actors() -> Dict[str, Any]:
+    """Snapshot of every tracked actor with their latest risk + baseline.
+
+    Sorted by latest_risk descending so the dashboard's "top movers"
+    table is one fetch away.
+    """
+    rows = _REALTIME.actors()
+    return {"count": len(rows), "actors": rows, "stats": _REALTIME.stats()}
+
+
+@router.get("/actors/{actor_id}/trajectory")
+async def actor_trajectory(actor_id: str) -> Dict[str, Any]:
+    """Full rolling-window trajectory for a single actor: every sample
+    plus the current baseline mean / stdev / z-threshold. Used by the
+    operator UI for per-actor drill-downs."""
+    traj = _REALTIME.trajectory(actor_id)
+    if traj["samples"] == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=f"no samples observed for actor {actor_id!r}",
+        )
+    return traj
+
+
+@router.get("/anomalies")
+async def list_anomalies(limit: int = 50) -> Dict[str, Any]:
+    """Most recent z-score anomalies (newest last). Bounded ring buffer;
+    older anomalies fall off as new ones arrive. Backs the SSE replay-on-
+    reconnect contract: any subscriber can re-fetch this to recover the
+    last N events without a full chain scan."""
+    items = _REALTIME.recent_anomalies(limit=max(1, min(int(limit), 200)))
+    return {"count": len(items), "anomalies": items}
+
+
 @router.get("/forecast/history")
 async def forecast_history(limit: int = 288) -> Dict[str, Any]:
     """Return the recent risk-history buffer for sparkline / trend rendering.
@@ -527,7 +613,14 @@ async def stream_risk():
     """
     async def gen():
         # Initial hello event so subscribers know the channel is open.
-        yield f"event: hello\ndata: {_json.dumps({'ok': True})}\n\n"
+        # Replays the most recent realtime stats so a fresh subscriber
+        # has immediate context without polling /actors first.
+        yield (
+            "event: hello\n"
+            f"data: {_json.dumps({'ok': True, 'realtime': _REALTIME.stats()})}\n\n"
+        )
+        # Cursor into the realtime anomaly buffer so we only emit deltas.
+        last_emitted = len(_REALTIME.recent_anomalies(limit=1_000))
         while True:
             forecast = _FORECASTER.to_dict()
             sample = forecast.get("forecast", [])
@@ -546,8 +639,22 @@ async def stream_risk():
                     "count": len(_QUARANTINE.list_quarantined()),
                     "threshold": _QUARANTINE.threshold,
                 },
+                "realtime": _REALTIME.stats(),
             }
             yield f"event: tick\ndata: {_json.dumps(payload, default=str)}\n\n"
+            # Drain any anomalies that fired since the last tick and push
+            # one ``anomaly`` event per new entry (newest last). The SSE
+            # transport handles back-pressure; if a subscriber is slow,
+            # the anomaly buffer keeps the most recent N regardless.
+            current = _REALTIME.recent_anomalies(limit=1_000)
+            new_count = len(current)
+            if new_count > last_emitted:
+                for verdict in current[last_emitted:]:
+                    yield (
+                        "event: anomaly\n"
+                        f"data: {_json.dumps(verdict, default=str)}\n\n"
+                    )
+                last_emitted = new_count
             await asyncio.sleep(5)
 
     return StreamingResponse(
