@@ -164,6 +164,44 @@ class AuditChain:
             data = data[-limit:]
         return data
 
+    def entry_at(self, index: int) -> Optional[AuditEntry]:
+        """Return the entry at the given chain index, or ``None`` if out of
+        range. Used by the per-entry receipt endpoint so a customer can
+        prove a single detection was logged without disclosing the rest of
+        the chain."""
+        with self._lock:
+            if 0 <= index < len(self._entries):
+                return self._entries[index]
+        return None
+
+    @staticmethod
+    def verify_entry_receipt(entry: Dict[str, Any]) -> Dict[str, Any]:
+        """Self-contained verification of a single entry receipt — does not
+        require access to the live chain.
+
+        Recomputes ``entry_hash = sha256(prev_hash || canonical(payload))``
+        and compares to the stored ``entry_hash``. This proves the receipt
+        is internally well-formed (the payload hasn't been edited and the
+        hash binding is intact). Cross-checking that the receipt matches
+        what the live chain holds at ``entry.index`` is left to the caller
+        (typically by fetching ``GET /audit/entry/{index}`` and comparing
+        ``entry_hash`` byte-for-byte)."""
+        try:
+            prev_hash = str(entry["prev_hash"])
+            payload = entry["payload"]
+            stored = str(entry["entry_hash"])
+        except (KeyError, TypeError):
+            return {"valid": False, "reason": "malformed entry receipt"}
+        recomputed = _hash(prev_hash, _canonical_json(payload))
+        if recomputed != stored:
+            return {
+                "valid": False,
+                "reason": "entry_hash does not match prev_hash + canonical(payload)",
+                "expected": recomputed,
+                "stored": stored,
+            }
+        return {"valid": True, "reason": "entry hash binding intact"}
+
     def head(self) -> str:
         with self._lock:
             return self._entries[-1].entry_hash if self._entries else GENESIS_HASH

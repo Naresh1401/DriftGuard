@@ -461,6 +461,35 @@ async def audit_anchor_history() -> Dict[str, Any]:
     return _AUDIT_CHAIN.verify_anchor_history(_ANCHOR_DIR)
 
 
+@router.get("/audit/entry/{index}")
+async def audit_entry(index: int) -> Dict[str, Any]:
+    """Return a single audit entry by chain index, plus a self-verification
+    block. Lets a customer prove a specific detection was logged without
+    needing to download the rest of the chain — they store the receipt at
+    detection time and re-fetch this endpoint later to confirm the chain
+    still holds the same entry at that index.
+    """
+    entry = _AUDIT_CHAIN.entry_at(index)
+    if entry is None:
+        raise HTTPException(status_code=404, detail=f"no entry at index {index}")
+    receipt = entry.to_dict()
+    return {
+        "entry": receipt,
+        "verification": _AUDIT_CHAIN.verify_entry_receipt(receipt),
+    }
+
+
+@router.post("/audit/entry/verify")
+async def audit_entry_verify(entry: Dict[str, Any] = Body(...)) -> Dict[str, Any]:
+    """Self-contained verification of a previously-issued entry receipt.
+    Does not consult the live chain — proves only that the receipt is
+    internally well-formed (the payload binding hash recomputes). To prove
+    chain inclusion, separately ``GET /audit/entry/{index}`` and confirm
+    the returned ``entry_hash`` matches the receipt's ``entry_hash``.
+    """
+    return _AUDIT_CHAIN.verify_entry_receipt(entry)
+
+
 @router.get("/forecast/history")
 async def forecast_history(limit: int = 288) -> Dict[str, Any]:
     """Return the recent risk-history buffer for sparkline / trend rendering.

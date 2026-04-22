@@ -2309,3 +2309,63 @@ The result is the same shape returned by `verify_anchor_history`. Operators no l
 ---
 
 *End of Appendix L — Operator-surfaced anchor-history audit.*
+
+---
+
+# Appendix M — Per-entry receipts
+
+The audit chain has supported full-chain verification (Appendix G), anchor mint/verify/history (H–L), and quarantine durability (J). What it has *not* supported until now is **per-entry proof**: a customer who wants to demonstrate "my detection X was logged at chain index N" had to download or trust the entire chain. Appendix M closes that.
+
+## M.1 New primitives
+
+`AuditChain.entry_at(index)` returns the entry at the given chain index (or `None` if out of range). The returned `AuditEntry.to_dict()` is the **receipt**: `{index, timestamp, prev_hash, payload, entry_hash}`.
+
+`AuditChain.verify_entry_receipt(receipt)` is a static, self-contained verifier. Recomputes `entry_hash = sha256(prev_hash || canonical(payload))` and compares to the stored value. Proves the receipt is internally well-formed — the payload hasn't been edited and the hash binding is intact — **without needing access to the live chain**.
+
+## M.2 New endpoints
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET`  | `/api/v1/ai-breach/audit/entry/{index}` | Returns `{entry, verification}` for a single chain index. |
+| `POST` | `/api/v1/ai-breach/audit/entry/verify` | Self-contained verification of a previously-issued receipt; no live-chain access. |
+
+## M.3 Customer flow
+
+1. At detection time, the customer stores their receipt (e.g. attaches it to their internal ticket).
+2. Later — weeks, months, an audit cycle — they `GET /audit/entry/{index}` and confirm the returned `entry_hash` matches the receipt's `entry_hash`. If they want a self-contained proof without any network call to DriftGuard, they `POST /audit/entry/verify` with their stored receipt and confirm the binding is intact.
+3. To prove the entry is also part of a *committed* chain state, they cross-check it against any anchor whose `length > index` (Appendix H+I+K mechanisms).
+
+This gives selective disclosure: the customer can prove a single detection was logged without exposing any other detection.
+
+## M.4 Tests
+
+- `test_entry_at_returns_entry_or_none` — index in range, out of range, negative.
+- `test_entry_receipt_round_trip` — append → fetch → verify.
+- `test_entry_receipt_detects_payload_tamper` — flipping the payload invalidates the receipt.
+- `test_entry_receipt_malformed` — missing required fields → graceful rejection.
+
+Project test count: **143 → 147 passing**.
+
+## M.5 Source mapping (extends §L.2)
+
+| Claim in §M | Code reference |
+| --- | --- |
+| `entry_at` + `verify_entry_receipt` | `backend/engine/ai_breach_governance.py::AuditChain` |
+| `GET /audit/entry/{index}` | `backend/api/routes/ai_breach.py::audit_entry` |
+| `POST /audit/entry/verify` | `backend/api/routes/ai_breach.py::audit_entry_verify` |
+| Tests | `backend/tests/test_ai_breach_governance.py` |
+
+## M.6 Mechanism completeness
+
+With M added, DriftGuard's audit surface now offers four independently composable evidence primitives:
+
+1. **Whole-chain integrity** — `GET /audit/verify` (G)
+2. **Snapshot anchoring** with mint, single verify, history walk — `POST /audit/anchor`, `POST /audit/anchor/verify`, `GET /audit/anchors` (H, I, K)
+3. **Linked anchor chain** — anchors-of-anchors (J)
+4. **Per-entry receipts** with self-contained verification — `GET/POST /audit/entry/...` (M)
+
+A regulator can now choose the granularity that matches their question: "show me the whole chain", "show me a published commitment from a specific date", "show me the anchor history is consistent", or "prove this single detection was logged".
+
+---
+
+*End of Appendix M — Per-entry receipts.*

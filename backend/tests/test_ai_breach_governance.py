@@ -311,3 +311,41 @@ def test_anchor_history_empty_dir(tmp_path):
     chain = AuditChain()
     res = chain.verify_anchor_history(str(tmp_path))
     assert res == {"count": 0, "valid": True, "broken_at": -1, "anchors": []}
+
+
+def test_entry_at_returns_entry_or_none():
+    chain = AuditChain()
+    chain.append({"event": "x"})
+    chain.append({"event": "y"})
+    e0 = chain.entry_at(0)
+    assert e0 is not None and e0.payload == {"event": "x"}
+    assert chain.entry_at(99) is None
+    assert chain.entry_at(-1) is None
+
+
+def test_entry_receipt_round_trip():
+    chain = AuditChain()
+    chain.append({"event": "alpha", "n": 1})
+    e = chain.entry_at(0)
+    assert e is not None
+    receipt = e.to_dict()
+    res = AuditChain.verify_entry_receipt(receipt)
+    assert res["valid"] is True
+
+
+def test_entry_receipt_detects_payload_tamper():
+    chain = AuditChain()
+    chain.append({"event": "alpha"})
+    e = chain.entry_at(0)
+    assert e is not None
+    receipt = e.to_dict()
+    receipt["payload"] = {"event": "FORGED"}
+    res = AuditChain.verify_entry_receipt(receipt)
+    assert res["valid"] is False
+    assert "entry_hash" in res["reason"]
+
+
+def test_entry_receipt_malformed():
+    res = AuditChain.verify_entry_receipt({"not": "an entry"})
+    assert res["valid"] is False
+    assert "malformed" in res["reason"]
