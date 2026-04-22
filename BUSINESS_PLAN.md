@@ -1671,3 +1671,433 @@ Each motion follows the same six steps (1) Beachhead persona → (2) Trigger eve
 
 ---
 
+## Appendix C — Visual Pack (Charts, Diagrams, Roadmaps)
+
+> All diagrams below render natively on GitHub via Mermaid. Export to PNG/SVG with `mmdc` for slide decks, or to a 15-page PDF with the VS Code "Markdown PDF" extension.
+
+### C.1 The Breach Lifecycle and Where DriftGuard Operates
+
+```mermaid
+flowchart LR
+    A[Stage 1<br/>Human Drift<br/>fatigue · hurry · hoarding] -->|days to weeks| B[Stage 2<br/>Policy Gap<br/>missed review · skipped MFA]
+    B -->|hours to days| C[Stage 3<br/>Initial Access<br/>phishing · stolen creds]
+    C -->|minutes to hours| D[Stage 4<br/>Lateral Movement<br/>privilege escalation]
+    D -->|seconds| E[Stage 5<br/>Exfiltration<br/>data theft · ransomware]
+
+    style A fill:#16a34a,color:#fff
+    style B fill:#22c55e,color:#fff
+    style C fill:#f59e0b,color:#fff
+    style D fill:#ea580c,color:#fff
+    style E fill:#dc2626,color:#fff
+```
+
+### C.2 Sector Breach Cost — 2024 Averages (source [2])
+
+```mermaid
+xychart-beta
+    title "Cost of a data breach by sector ($M)"
+    x-axis ["Healthcare", "Financial", "Industrial", "Energy", "Tech", "Pharma", "Global avg"]
+    y-axis "Average breach cost ($M)" 0 --> 11
+    bar [9.77, 6.08, 5.56, 5.29, 4.97, 5.10, 4.88]
+```
+
+### C.3 Direct Addressable Category — Insider + UEBA
+
+```mermaid
+pie showData
+    title DriftGuard direct category 2024 ($B, sources [6][7])
+    "Insider Threat Management" : 4.27
+    "User & Entity Behavior Analytics" : 1.61
+```
+
+### C.4 Cybersecurity Spend by Sector (2024)
+
+```mermaid
+xychart-beta
+    title "Sector cybersecurity spend ($B)"
+    x-axis ["Financial[9]", "Tech est.", "Govt est.", "Manuf est.", "Healthcare[8]", "Critical infra est.", "Retail est.", "Legal est.", "Education est."]
+    y-axis "Annual spend ($B)" 0 --> 55
+    bar [48.4, 32, 30, 24, 21.25, 20, 16, 11, 7]
+```
+
+### C.5 ARR Trajectory — Four-Year Plan
+
+```mermaid
+xychart-beta
+    title "Planned ARR ($M)"
+    x-axis ["2026", "2027", "2028", "2029"]
+    y-axis "ARR ($M)" 0 --> 25
+    bar [0.336, 1.97, 7.92, 22.9]
+    line [0.336, 1.97, 7.92, 22.9]
+```
+
+### C.6 Logo Growth Plan
+
+```mermaid
+xychart-beta
+    title "Paying customers by year"
+    x-axis ["2026", "2027", "2028", "2029"]
+    y-axis "Logos" 0 --> 320
+    bar [12, 36, 110, 310]
+```
+
+### C.7 Unit Economics vs SaaS Benchmarks [12]
+
+```mermaid
+xychart-beta
+    title "DriftGuard target (bar) vs SaaS median (line)"
+    x-axis ["Gross margin %", "NRR %", "CAC payback (mo)", "LTV:CAC"]
+    y-axis "value" 0 --> 130
+    bar [78, 118, 11, 12]
+    line [76, 100, 14, 3]
+```
+
+### C.8 12-Month Execution Gantt
+
+```mermaid
+gantt
+    title DriftGuard execution Q2 2026 → Q1 2027
+    dateFormat  YYYY-MM-DD
+    axisFormat  %b %Y
+
+    section Engineering
+    PostgreSQL migration               :done,    eng1, 2026-04-01, 30d
+    SSE + Risk Forecast V2             :done,    eng2, 2026-04-01, 21d
+    Multi-tenant architecture          :active,  eng3, 2026-05-01, 60d
+    Slack · PagerDuty · Teams          :         eng4, 2026-07-01, 45d
+    DeBERTa-v3 fine-tune               :         eng5, 2026-08-15, 60d
+    Kafka streaming                    :         eng6, 2026-10-01, 60d
+
+    section Compliance
+    SOC 2 Type 1                       :active,  c1, 2026-04-15, 75d
+    SOC 2 Type 2 audit window          :         c2, 2026-09-01, 180d
+    FedRAMP Moderate sprint            :         c3, 2026-10-15, 360d
+
+    section Go-To-Market
+    5 design partners                  :active,  g1, 2026-04-01, 90d
+    Splunk Marketplace                 :         g2, 2026-07-01, 60d
+    Sentinel workbook                  :         g3, 2026-07-15, 60d
+    First 12 paying logos              :         g4, 2026-08-01, 150d
+    RSA + Black Hat                    :         g5, 2026-08-01, 30d
+
+    section Funding
+    Seed extension $750k               :         f1, 2026-05-01, 90d
+    Series A pre-empt                  :         f2, 2026-12-01, 90d
+```
+
+### C.9 System Architecture
+
+```mermaid
+flowchart TB
+    subgraph Sources["Enterprise data sources"]
+        S1[Splunk]
+        S2[Sentinel]
+        S3[CloudTrail]
+        S4[Google Workspace]
+        S5[Epic EMR]
+        S6[SDK / webhook]
+    end
+
+    Sources --> ING[Signal Ingestion<br/>PII anonymized]
+    ING --> TW[Temporal Weighting<br/>recency × frequency]
+    TW --> LG[LangGraph 8-node pipeline]
+
+    LG --> RF[Risk Forecast Engine<br/>saturating P_breach curve]
+    LG --> EW[Early Warning Engine]
+    EW --> SSE[SSE stream<br/>/api/v1/stream/events]
+    RF --> API[REST API<br/>/api/v1/risk-forecast]
+
+    SSE --> UI[React dashboards]
+    API --> UI
+    UI --> R1[Admin]
+    UI --> R2[CISO]
+    UI --> R3[Compliance]
+    UI --> R4[NI Architect]
+    UI --> R5[Viewer]
+
+    style ING fill:#dbeafe
+    style RF fill:#dcfce7
+    style EW fill:#dcfce7
+    style SSE fill:#fef3c7
+```
+
+### C.10 Six Drift Patterns and NIST Controls (source [5])
+
+```mermaid
+flowchart LR
+    F[Fatigue] --> N1[CA-7 · AU-6]
+    O[Overconfidence] --> N2[AC-2 · AT-2]
+    H[Hurry] --> N3[IR-6 · CA-7]
+    Q[QuietFear] --> N4[IR-6 · AU-6]
+    HO[Hoarding] --> N5[AC-2]
+    CT[ComplianceTheater] --> N6[AU-6 · AT-2]
+
+    style F fill:#fde68a
+    style O fill:#fecaca
+    style H fill:#fdba74
+    style Q fill:#bfdbfe
+    style HO fill:#c7d2fe
+    style CT fill:#fbcfe8
+```
+
+### C.11 Competitive Positioning Quadrant
+
+```mermaid
+quadrantChart
+    title Ethical breadth × predictive depth
+    x-axis "Surveillance-heavy" --> "Ethics-first"
+    y-axis "Reactive (post-breach)" --> "Predictive (pre-breach)"
+    quadrant-1 "Predictive · Ethics-first (DriftGuard zone)"
+    quadrant-2 "Predictive · Surveillance"
+    quadrant-3 "Reactive · Surveillance"
+    quadrant-4 "Reactive · Ethics-first"
+    "DriftGuard": [0.85, 0.85]
+    "Splunk UBA": [0.25, 0.55]
+    "Sentinel UEBA": [0.30, 0.55]
+    "Exabeam": [0.30, 0.50]
+    "Securonix": [0.30, 0.50]
+    "DTEX": [0.15, 0.45]
+    "Forcepoint": [0.15, 0.40]
+    "Proofpoint ITM": [0.20, 0.35]
+    "Code42": [0.40, 0.20]
+    "Darktrace": [0.55, 0.45]
+    "CrowdStrike": [0.55, 0.30]
+    "Vectra": [0.60, 0.40]
+```
+
+### C.12 Five Moats (Mind-Map)
+
+```mermaid
+mindmap
+  root((DriftGuard moats))
+    Ethics-first
+      No PII in schema
+      GDPR Art. 22 [10]
+      EU AI Act safe harbor [11]
+    Predictive math
+      Saturating probability curve
+      95 percent CI
+      Calibrated to IBM 2024 [2]
+    NIST-native
+      AC-2 AT-2 AU-6 CA-7 IR-6 [5]
+      Audit-ready out of the box
+    Universal integration
+      Splunk Sentinel CloudTrail
+      Workspace Epic EMR
+      SDK + webhooks
+    Calibration corpus
+      Every approved response sharpens engine
+      Network effect
+      Switching cost
+```
+
+### C.13 Funnel — Outreach to Paid Logo (Year 1)
+
+```mermaid
+flowchart LR
+    A[1,000 outreach<br/>compliance + CISO]
+    B[180 discovery calls<br/>18 percent response]
+    C[60 POVs<br/>33 percent qualify]
+    D[21 paid pilots<br/>35 percent convert]
+    E[12 paid logos<br/>57 percent close]
+    A --> B --> C --> D --> E
+
+    style A fill:#dbeafe
+    style B fill:#bfdbfe
+    style C fill:#93c5fd
+    style D fill:#60a5fa
+    style E fill:#16a34a,color:#fff
+```
+
+### C.14 Sales Cycle (Healthcare Example)
+
+```mermaid
+gantt
+    title Healthcare deal cycle — typical 90 days
+    dateFormat  YYYY-MM-DD
+    axisFormat  %b %d
+
+    section Discovery
+    Outreach + intro                :a1, 2026-05-01, 7d
+    Discovery + scoping             :a2, after a1, 10d
+
+    section POV
+    Procurement + MSA               :a3, after a2, 14d
+    Install + connectors            :a4, after a3, 7d
+    30-day pilot                    :a5, after a4, 30d
+
+    section Close
+    CISO readout                    :a6, after a5, 5d
+    Board summary                   :a7, after a6, 7d
+    Order form signed               :a8, after a7, 10d
+```
+
+### C.15 SWOT (Visual)
+
+```mermaid
+quadrantChart
+    title DriftGuard SWOT
+    x-axis "External" --> "Internal"
+    y-axis "Negative" --> "Positive"
+    quadrant-1 "STRENGTHS"
+    quadrant-2 "OPPORTUNITIES"
+    quadrant-3 "THREATS"
+    quadrant-4 "WEAKNESSES"
+    "Ethics-first architecture": [0.80, 0.85]
+    "NIST-native model": [0.78, 0.80]
+    "Predictive probability": [0.82, 0.78]
+    "Live in production": [0.75, 0.70]
+    "EU AI Act tailwind": [0.20, 0.85]
+    "Insider Risk 15.4 pct CAGR [6]": [0.18, 0.78]
+    "MSSP white-label channel": [0.22, 0.72]
+    "Cyber-insurance partnership": [0.15, 0.68]
+    "Splunk MS clone risk": [0.18, 0.20]
+    "Procurement velocity": [0.22, 0.15]
+    "Free-tier optics": [0.25, 0.25]
+    "First-time founder": [0.78, 0.20]
+    "Single-tenant default": [0.82, 0.25]
+    "Awaiting SOC 2 Type 2": [0.75, 0.18]
+```
+
+### C.16 Risk Heatmap
+
+```mermaid
+quadrantChart
+    title Risk register — likelihood × impact (from §12)
+    x-axis "Low likelihood" --> "High likelihood"
+    y-axis "Low impact" --> "High impact"
+    quadrant-1 "Watch closely"
+    quadrant-2 "Mitigate now"
+    quadrant-3 "Monitor"
+    quadrant-4 "Plan for"
+    "False positive trust": [0.80, 0.85]
+    "Large SIEM clones feature": [0.55, 0.85]
+    "Legal pushback": [0.45, 0.85]
+    "Customer churn no breach": [0.55, 0.55]
+    "Model accuracy new domains": [0.55, 0.55]
+    "ML hiring difficulty": [0.80, 0.55]
+    "Tight fundraising": [0.55, 0.55]
+    "Founder bandwidth": [0.65, 0.65]
+    "FedRAMP delay": [0.50, 0.45]
+```
+
+### C.17 KPI Control Plane
+
+```mermaid
+flowchart TB
+    K1[ARR<br/>$336k → $1.97M]
+    K2[Logos<br/>12 → 36]
+    K3[NRR<br/>105 → 118 percent]
+    K4[Gross margin<br/>78 percent]
+    K5[CAC payback<br/>14mo → 11mo]
+    K6[Detection precision<br/>0.78 → 0.88]
+    K7[Calibration corpus<br/>2k → 8k]
+    K8[NPS<br/>50 → 65]
+
+    style K1 fill:#dcfce7
+    style K2 fill:#dcfce7
+    style K3 fill:#dbeafe
+    style K4 fill:#dbeafe
+    style K5 fill:#fef3c7
+    style K6 fill:#fef3c7
+    style K7 fill:#fce7f3
+    style K8 fill:#fce7f3
+```
+
+### C.18 Funding Ladder
+
+```mermaid
+flowchart LR
+    PS[Pre-seed<br/>$0.5–1M<br/>Mo 0–6]
+    SD[Seed<br/>$3–5M<br/>Mo 12–18]
+    SA[Series A<br/>$15–25M<br/>Mo 24–36]
+    SB[Series B<br/>$25M+<br/>Mo 36–48]
+    EX[Exit<br/>IPO or strategic<br/>$400M+]
+
+    PS --> SD --> SA --> SB --> EX
+    style PS fill:#dbeafe
+    style SD fill:#bfdbfe
+    style SA fill:#60a5fa,color:#fff
+    style SB fill:#2563eb,color:#fff
+    style EX fill:#16a34a,color:#fff
+```
+
+### C.19 Buyer Persona Map
+
+```mermaid
+mindmap
+  root((Buyer ecosystem))
+    Economic buyer
+      CISO
+      CFO co-sign at $250k+
+    Champion
+      Compliance officer
+      Head of operational risk
+    Technical evaluator
+      Security architect
+      SOC lead
+    Influencer
+      Internal audit
+      Privacy officer DPO
+    Blocker
+      Procurement
+      Legal review
+    User
+      SOC analyst
+      Compliance analyst
+      Board read-only
+```
+
+### C.20 Ethical Architecture (Visual Promise)
+
+```mermaid
+flowchart TB
+    A[Raw event] -->|strip identifiers| B[Anonymized signal]
+    B --> C[Aggregate by team / domain / role-class]
+    C --> D[Pattern detection]
+    D --> E[Org-level alert]
+
+    X[Individual identifier] -.forbidden.-> B
+    Y[Per-person score] -.forbidden.-> D
+    Z[Re-identification] -.forbidden.-> E
+
+    style A fill:#fde68a
+    style B fill:#bfdbfe
+    style C fill:#bfdbfe
+    style D fill:#dcfce7
+    style E fill:#16a34a,color:#fff
+    style X fill:#fee2e2
+    style Y fill:#fee2e2
+    style Z fill:#fee2e2
+```
+
+> Dashed red lines = explicitly forbidden flows. The schema literally has no fields to support them.
+
+---
+
+## Page Map (≈15 pages when exported to PDF)
+
+| Page | Section | Visual on page |
+|---:|---|---|
+| 1 | §1 Executive Summary | — |
+| 2 | §2 Problem Statement | C.2 sector breach cost |
+| 3 | §3 Solution + Pipeline | C.10 patterns map |
+| 4 | §4 Market Opportunity | C.3 pie · C.4 sector spend |
+| 5 | §5 Product Overview | C.9 architecture |
+| 6 | §6 Business Model | C.7 unit-econ vs benchmarks |
+| 7 | §7 Go-To-Market | C.13 funnel · C.14 sales cycle |
+| 8 | §8 Competitive Landscape | C.11 quadrant · C.12 moats |
+| 9 | §9 Financial Projections | C.5 ARR · C.6 logos · C.18 funding ladder |
+| 10 | §10 Team + §11 Roadmap | C.8 Gantt |
+| 11 | §12 Risks + §13 Open Questions | C.15 SWOT · C.16 risk heatmap |
+| 12 | §14 Sources | — |
+| 13 | Appendix A — V2 Addendum | C.1 lifecycle |
+| 14 | Appendix B — Strategic Deep-Dive | C.19 buyer map · C.17 KPI plane |
+| 15 | Appendix C — Visual Pack | C.20 ethical promise |
+
+> **Export to a single PDF** — install the VS Code "Markdown PDF" extension (`yzane.markdown-pdf`), open this file, then `Cmd+Shift+P → Markdown PDF: Export (pdf)`. Mermaid renders automatically. For slides, run `npx @marp-team/marp-cli BUSINESS_PLAN.md --pdf`.
+
+---
+
+*End of business plan v2 — cited + visual edition · 20 diagrams · 15-page PDF layout.*
+
