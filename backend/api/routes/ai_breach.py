@@ -9,11 +9,15 @@ Routes:
 """
 from __future__ import annotations
 
+import asyncio
+import json as _json
+import os
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from core.ai_drift_patterns import (
@@ -52,7 +56,17 @@ _FORECASTER = RiskForecaster()
 
 # Append-only audit chain of every detection produced via /scan.
 # Used by /audit/* endpoints to expose tamper-evident evidence to auditors.
-_AUDIT_CHAIN = AuditChain()
+# Persisted as JSON-Lines so the chain survives process restarts; the file
+# is read-only in operational practice (everything is replayed at boot).
+_AUDIT_PATH = os.environ.get(
+    "DRIFTGUARD_AUDIT_PATH",
+    str(__import__("pathlib").Path(__file__).resolve().parents[2] / "data" / "ai_breach_audit.jsonl"),
+)
+_ANCHOR_DIR = os.environ.get(
+    "DRIFTGUARD_ANCHOR_DIR",
+    str(__import__("pathlib").Path(__file__).resolve().parents[2] / "data" / "anchors"),
+)
+_AUDIT_CHAIN = AuditChain(storage_path=_AUDIT_PATH)
 
 # Per-actor risk circuit breaker. Threshold tuned so that two Critical
 # detections (~70 each) inside the window will trip quarantine.
@@ -404,3 +418,63 @@ async def quarantine_release(actor_id: str, req: ReleaseRequest) -> Dict[str, An
         "actor_id": actor_id,
         "audit_entry_hash": entry.entry_hash,
     }
+
+
+# ── Governance: external anchor snapshot ─────────────
+
+@router.post("/audit/anchor")
+async def audit_anchor() -> Dict[str, Any]:
+    """Produce a portable snapshot of the current chain head (length, head,
+    timestamp, anchor_id). The snapshot is also written to disk under the
+    configured anchor directory so external systems (object-locked S3,
+    customer git repo, public timestamp service) can publish it for
+    independent tamper-evidence beyond the in-process chain."""
+    return _AUDIT_CHAIN.anchor_snapshot(anchor_dir=_ANCHOR_DIR)
+
+
+# ── Real-time SSE risk stream ────────────────────────
+
+@router.get("/stream")
+async def stream_risk():
+    """Server-Sent Events stream of live AI-breach posture.
+
+    Each event payload contains:
+      - forecast EWMA + 95% upper band sample
+      - audit chain head + length
+      - quarantine count
+
+    Clients (the dashboard, a SOC ticker, a NOC display) reconnect for free
+    on disconnect — SSE handles the transport. The stream is read-only and
+    requires no auth in the current deployment; production hardening would
+    add the same Bearer check as the SDK's optional ``api_key``.
+    """
+    async def gen():
+        # Initial hello event so subscribers know the channel is open.
+        yield f"event: hello\ndata: {_json.dumps({'ok': True})}\n\n"
+        while True:
+            forecast = _FORECASTER.to_dict()
+            sample = forecast.get("forecast", [])
+            payload = {
+                "ts": datetime.utcnow().isoformat(),
+                "forecast": {
+                    "ewma": forecast.get("current_ewma"),
+                    "samples": forecast.get("samples"),
+                    "next": sample[-1] if sample else None,
+                },
+                "audit": {
+                    "length": len(_AUDIT_CHAIN),
+                    "head": _AUDIT_CHAIN.head(),
+                },
+                "quarantine": {
+                    "count": len(_QUARANTINE.list_quarantined()),
+                    "threshold": _QUARANTINE.threshold,
+                },
+            }
+            yield f"event: tick\ndata: {_json.dumps(payload, default=str)}\n\n"
+            await asyncio.sleep(5)
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

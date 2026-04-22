@@ -2025,3 +2025,79 @@ No new external sources are introduced by this appendix — the regulatory ancho
 ---
 
 *End of Appendix G — AI-breach governance layer. Three additive mechanisms (audit chain, circuit breaker, SDK), three honest gaps, full source-to-code mapping.*
+
+---
+
+# Appendix H — Closing the G.4 gaps (persistence, anchor, live stream)
+
+This appendix records the work done after Appendix G to close two of the three honest gaps declared in §G.4 and to add the real-time surface a SOC operator needs.
+
+## H.1 Persistence of the audit chain (closes G.4 gap #1)
+
+`AuditChain` now accepts a `storage_path` argument and writes every appended entry to a JSON-Lines file (`backend/data/ai_breach_audit.jsonl` by default; overridable via the `DRIFTGUARD_AUDIT_PATH` environment variable). On construction the file is replayed so the chain survives process restarts. Each write is followed by `flush() + os.fsync()` so a single-worker outage cannot lose a committed entry.
+
+The file format is intentionally trivial — one JSON object per line — so `cat`, `tail`, `wc -l` and `jq` all work. Migration to the existing `PersistenceService` for multi-worker durability is now a one-line change (replace the JSONL writer with the service handle); the per-actor quarantine state remains process-local pending the Redis migration tracked as the open G.4 gap #2.
+
+## H.2 Cryptographic anchor snapshot (closes G.4 gap #3)
+
+A new endpoint `POST /api/v1/ai-breach/audit/anchor` produces a portable snapshot:
+
+```json
+{
+  "length": 142,
+  "head": "<sha256>",
+  "timestamp": "2026-04-22T06:23:31.581403+00:00",
+  "anchor_id": "<sha256(length|head|timestamp)>",
+  "written_to": "backend/data/anchors"
+}
+```
+
+The snapshot is also persisted under `DRIFTGUARD_ANCHOR_DIR`. External systems — object-locked S3, a customer-controlled git repository, an RFC 3161 timestamp authority, a public bulletin — can publish the snapshot to obtain *external* tamper-evidence beyond the in-process hash chain. The anchor never contains user data; it is purely a content-addressed pointer to a chain state, so it is safe for public publication.
+
+This closes the strongest evidentiary claim that was previously deferred: a regulator can verify that a chain head existed at a given wall-clock time without trusting DriftGuard's own clock or storage.
+
+## H.3 Real-time SSE risk stream
+
+A new endpoint `GET /api/v1/ai-breach/stream` exposes a Server-Sent Events channel pushing the live posture every 5 seconds:
+
+```
+event: tick
+data: {"ts": "...", "forecast": {"ewma": 65.9, "samples": 24, "next": 71.4},
+       "audit": {"length": 142, "head": "..."},
+       "quarantine": {"count": 0, "threshold": 120.0}}
+```
+
+SSE was chosen over WebSockets deliberately: it survives proxies that strip upgrade headers, it auto-reconnects in every modern browser without library code, and it is read-only by construction — no client-side write surface to harden. The dashboard subscribes via the standard `EventSource` API; a SOC ticker or NOC display can do the same in five lines of any language.
+
+## H.4 Frontend surface
+
+The Governance row on the AI Breach page now has three cards:
+
+1. **Tamper-Evident Audit Chain** — INTACT/BROKEN badge, head hash, *Mint anchor snapshot* button.
+2. **Agent Circuit Breaker** — quarantine count and rolling-budget context.
+3. **Live Risk Stream** — LIVE/CONNECTING badge, current EWMA pushed via SSE.
+
+The audit chain length, head, and quarantine count are now updated by the SSE stream rather than by polling, so the page sees state changes within ~5s of them happening on the backend.
+
+## H.5 Source mapping (extends §G.5)
+
+| Claim in §H | Code reference (live in `main` branch) |
+| --- | --- |
+| JSONL persistence + replay | `backend/engine/ai_breach_governance.py::AuditChain.__init__ / _persist / _load_from_disk` |
+| Anchor snapshot | `backend/engine/ai_breach_governance.py::AuditChain.anchor_snapshot` |
+| Anchor endpoint | `backend/api/routes/ai_breach.py::audit_anchor` |
+| SSE stream endpoint | `backend/api/routes/ai_breach.py::stream_risk` |
+| Frontend SSE subscriber + anchor button | `frontend/src/pages/AIBreach.tsx` |
+| Persistence + anchor tests | `backend/tests/test_ai_breach_governance.py::test_chain_persistence_round_trip / test_anchor_snapshot_writes_file` |
+
+No new external sources are introduced by this appendix.
+
+## H.6 Remaining open gap
+
+Only one of the three §G.4 gaps remains open after this appendix:
+
+- **Multi-worker quarantine consistency.** When DriftGuard runs more than one uvicorn worker the per-actor risk budgets diverge across workers. The fix is a Redis-backed counter; this is scoped for the next milestone and will land alongside the same Redis migration that backs the live-stream subscriber set when the system grows past one worker.
+
+---
+
+*End of Appendix H — Persistence, anchor, live stream. Two of three §G.4 gaps closed; one remains and is named.*

@@ -133,3 +133,31 @@ def test_quarantine_falls_back_to_signal_bucket_when_no_actor():
     rec = q.record(d)
     assert rec is not None
     assert rec.actor_id.startswith("signal:")
+
+
+# ── Persistence + anchor ─────────────────────────────
+
+def test_chain_persistence_round_trip(tmp_path):
+    path = tmp_path / "chain.jsonl"
+    c1 = AuditChain(storage_path=str(path))
+    c1.append({"event": "a", "n": 1})
+    c1.append({"event": "b", "n": 2})
+    head1 = c1.head()
+    # Re-open: chain is replayed and verifies intact.
+    c2 = AuditChain(storage_path=str(path))
+    assert len(c2) == 2
+    assert c2.head() == head1
+    assert c2.verify() == {"intact": True, "broken_at": -1, "length": 2, "head": head1}
+
+
+def test_anchor_snapshot_writes_file(tmp_path):
+    chain = AuditChain()
+    chain.append({"event": "x"})
+    out = chain.anchor_snapshot(anchor_dir=str(tmp_path))
+    assert out["length"] == 1
+    assert out["head"] == chain.head()
+    assert "anchor_id" in out and len(out["anchor_id"]) == 64
+    files = list(tmp_path.glob("anchor-*.json"))
+    assert len(files) == 1
+    on_disk = files[0].read_text(encoding="utf-8")
+    assert out["anchor_id"] in on_disk

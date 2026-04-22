@@ -107,6 +107,8 @@ export default function AIBreach() {
   const [openPlaybook, setOpenPlaybook] = useState<string | null>(null)
   const [audit, setAudit] = useState<{ length: number; head: string; intact: boolean } | null>(null)
   const [quarantine, setQuarantine] = useState<{ count: number; threshold: number; window_minutes: number } | null>(null)
+  const [anchor, setAnchor] = useState<{ anchor_id: string; head: string; length: number; timestamp: string } | null>(null)
+  const [liveTick, setLiveTick] = useState<{ ts: string; forecast: { ewma: number | null; samples: number } } | null>(null)
 
   async function loadGovernance() {
     try {
@@ -118,6 +120,15 @@ export default function AIBreach() {
       setQuarantine({ count: q.count, threshold: q.threshold, window_minutes: q.window_minutes })
     } catch {
       /* governance is best-effort; silently ignore */
+    }
+  }
+
+  async function createAnchor() {
+    try {
+      const r = await fetch(`${API_BASE}/ai-breach/audit/anchor`, { method: 'POST' })
+      if (r.ok) setAnchor(await r.json())
+    } catch {
+      /* best-effort */
     }
   }
 
@@ -159,6 +170,20 @@ export default function AIBreach() {
     loadAll()
     runDemoScan()
     loadGovernance()
+    // Subscribe to live SSE risk stream — auto-reconnects on disconnect.
+    const url = `${API_BASE}/ai-breach/stream`
+    const es = new EventSource(url)
+    es.addEventListener('tick', (ev) => {
+      try {
+        const data = JSON.parse((ev as MessageEvent).data)
+        setLiveTick(data)
+        if (data.audit) setAudit((prev) => prev ? { ...prev, length: data.audit.length, head: data.audit.head } : prev)
+        if (data.quarantine) setQuarantine((prev) => prev ? { ...prev, count: data.quarantine.count } : prev)
+      } catch {
+        /* ignore malformed event */
+      }
+    })
+    return () => es.close()
   }, [])
 
   const playbookByPattern = playbooks.reduce<Record<string, Playbook>>((acc, p) => {
@@ -362,7 +387,7 @@ export default function AIBreach() {
       )}
 
       {/* Governance: tamper-evident audit chain + agent quarantine */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between">
             <div className="text-xs uppercase tracking-wide text-slate-500">Tamper-Evident Audit Chain</div>
@@ -379,10 +404,17 @@ export default function AIBreach() {
               head: {audit.head.slice(0, 32)}…
             </div>
           )}
-          <p className="mt-3 text-xs text-slate-600">
-            Every AI-breach detection is appended to a SHA-256 chain. Backs NIST AI RMF GOVERN-1.4
-            and the EU AI Act Art. 12 logging obligation for high-risk systems.
-          </p>
+          <button
+            onClick={createAnchor}
+            className="mt-3 text-xs px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-700"
+          >
+            Mint anchor snapshot
+          </button>
+          {anchor && (
+            <div className="mt-2 text-[10px] font-mono text-emerald-700 truncate" title={anchor.anchor_id}>
+              anchor: {anchor.anchor_id.slice(0, 24)}…
+            </div>
+          )}
         </div>
         <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between">
@@ -400,6 +432,24 @@ export default function AIBreach() {
           <p className="mt-3 text-xs text-slate-600">
             When an actor's cumulative AI-breach risk crosses the budget the circuit breaker trips
             a structured kill-switch record. Action stays with the human-review gate by design.
+          </p>
+        </div>
+        <div className="p-5 bg-white rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="text-xs uppercase tracking-wide text-slate-500">Live Risk Stream</div>
+            <span className={`text-xs px-2 py-0.5 rounded-full ${liveTick ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+              {liveTick ? 'LIVE' : 'CONNECTING'}
+            </span>
+          </div>
+          <div className="mt-3 text-3xl font-bold text-slate-900">
+            {liveTick?.forecast?.ewma != null ? liveTick.forecast.ewma.toFixed(1) : '—'}
+          </div>
+          <div className="text-xs text-slate-500">
+            current EWMA · {liveTick?.forecast?.samples ?? 0} samples
+          </div>
+          <p className="mt-3 text-xs text-slate-600">
+            Server-Sent Events stream pushed every 5s. Reconnects automatically on any
+            transient disconnect. No polling, no auth required for read-only posture.
           </p>
         </div>
       </div>

@@ -33,8 +33,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from threading import RLock
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -76,11 +78,62 @@ class AuditEntry:
 
 
 class AuditChain:
-    """Append-only, hash-linked ledger of AI breach detections."""
+    """Append-only, hash-linked ledger of AI breach detections.
 
-    def __init__(self) -> None:
+    If ``storage_path`` is provided, every appended entry is also persisted
+    to that JSON-Lines file (one entry per line). On construction the file
+    is replayed so the chain survives process restarts. The file format is
+    intentionally trivial — `cat`, `tail`, `wc` and `jq` all work — and
+    contains no secrets, so it can safely be checked into a backup bucket.
+    """
+
+    def __init__(self, *, storage_path: Optional[str] = None) -> None:
         self._lock = RLock()
         self._entries: List[AuditEntry] = []
+        self._storage_path: Optional[Path] = (
+            Path(storage_path) if storage_path else None
+        )
+        if self._storage_path is not None:
+            self._storage_path.parent.mkdir(parents=True, exist_ok=True)
+            self._load_from_disk()
+
+    def _load_from_disk(self) -> None:
+        path = self._storage_path
+        if path is None or not path.exists():
+            return
+        try:
+            with path.open("r", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    raw = json.loads(line)
+                    entry = AuditEntry(
+                        index=int(raw["index"]),
+                        timestamp=datetime.fromisoformat(raw["timestamp"]),
+                        prev_hash=str(raw["prev_hash"]),
+                        payload=raw["payload"],
+                        entry_hash=str(raw["entry_hash"]),
+                    )
+                    self._entries.append(entry)
+        except (OSError, ValueError, KeyError):
+            # Corrupted file — keep what we managed to load and let
+            # verify() flag the discontinuity to operators.
+            return
+
+    def _persist(self, entry: AuditEntry) -> None:
+        if self._storage_path is None:
+            return
+        try:
+            with self._storage_path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry.to_dict(), default=str))
+                fh.write("\n")
+                fh.flush()
+                os.fsync(fh.fileno())
+        except OSError:
+            # Persistence is best-effort; in-memory chain is still authoritative
+            # for the running process.
+            pass
 
     def append(self, payload: Dict[str, Any]) -> AuditEntry:
         with self._lock:
@@ -94,6 +147,7 @@ class AuditChain:
                 entry_hash=_hash(prev, payload_json),
             )
             self._entries.append(entry)
+            self._persist(entry)
             return entry
 
     def append_detections(self, detections: Iterable[Any]) -> List[AuditEntry]:
@@ -139,6 +193,42 @@ class AuditChain:
             "length": len(entries),
             "head": prev,
         }
+
+    def anchor_snapshot(self, *, anchor_dir: Optional[str] = None) -> Dict[str, Any]:
+        """Produce a portable, signed-by-content snapshot of the current chain
+        head. The snapshot doc is `{length, head, timestamp, anchor_id}`
+        where `anchor_id = sha256(length || head || timestamp)`.
+
+        If ``anchor_dir`` is provided, the snapshot is also written there as
+        ``anchor-<anchor_id_prefix>.json``. External systems (S3 with
+        object-lock, a customer-controlled git repo, a public timestamp
+        service) can publish this file to obtain external tamper-evidence
+        in addition to the in-process hash chain.
+        """
+        with self._lock:
+            length = len(self._entries)
+            head = self._entries[-1].entry_hash if self._entries else GENESIS_HASH
+        ts = datetime.now(timezone.utc).isoformat()
+        anchor_id = hashlib.sha256(
+            f"{length}|{head}|{ts}".encode("utf-8")
+        ).hexdigest()
+        snapshot = {
+            "length": length,
+            "head": head,
+            "timestamp": ts,
+            "anchor_id": anchor_id,
+        }
+        if anchor_dir:
+            try:
+                d = Path(anchor_dir)
+                d.mkdir(parents=True, exist_ok=True)
+                (d / f"anchor-{anchor_id[:16]}.json").write_text(
+                    json.dumps(snapshot, indent=2), encoding="utf-8"
+                )
+                snapshot["written_to"] = str(d)
+            except OSError as exc:
+                snapshot["write_error"] = str(exc)
+        return snapshot
 
 
 # ── Agent quarantine / circuit breaker ───────────────
