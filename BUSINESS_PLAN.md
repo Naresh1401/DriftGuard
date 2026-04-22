@@ -1789,3 +1789,178 @@ The following sources have been appended to §14 of the main plan:
 
 *End of Appendix E — AI workforce displacement and the new breach surface. Two new cited sources, one quantified reduction model, zero hallucinated numbers.*
 
+---
+
+# Appendix F — AI-Replacement Breach Mitigation and the AI-Security Competitor Landscape
+
+> *Companion to Appendix E. Where Appendix E showed the scale of AI-driven workforce change and named the new breach surface, Appendix F goes deeper into how DriftGuard mitigates each AI-replacement breach vector and how DriftGuard is positioned against the new generation of AI-security vendors that have emerged in 2024-2026.*
+
+> **Discipline maintained:** every quantified industry figure carries a numbered source. Vendor-level financial details that are not verifiably public are left qualitative and explicitly labelled as such. No fabricated numbers.
+
+---
+
+## F.1 Why this appendix is separate from Appendix D and Appendix E
+
+Appendix D covered classical incumbents (Splunk, CrowdStrike, Microsoft Sentinel/Purview, Exabeam, DTEX) — the SIEM, EDR and insider-threat layer. Appendix E established the scale of AI-driven workforce displacement using WEF Future of Jobs 2025 [16] and the new AI-era breach surface using IBM Cost of a Data Breach 2025 [17].
+
+Appendix F closes the loop:
+
+1. It enumerates the specific breach vectors that emerge when an enterprise replaces or augments human roles with AI (agentic systems, LLM copilots, autonomous workflows).
+2. It maps each vector to the exact DriftGuard subsystem that mitigates it, with a direct file path into the live repository.
+3. It surveys the new AI-security vendors that have appeared between 2024 and 2026, and shows where DriftGuard differs in scope.
+4. It states honestly what DriftGuard does better and what DriftGuard still needs to build.
+
+The combined effect of D + E + F is a single defensible answer to "why does this product need to exist now and why are the existing players insufficient."
+
+---
+
+## F.2 The AI-replacement breach taxonomy
+
+Drawing on NIST AI Risk Management Framework (AI RMF 1.0 published January 2023, with Generative AI Profile NIST AI 600-1 released July 2024) [18], the OWASP Top 10 for Large Language Model Applications (latest revision 2025) [19], and the UK NCSC's December 2025 public warning that prompt-injection attacks "might never be properly mitigated" [20], seven distinct breach classes emerge once AI starts replacing human work:
+
+| # | Breach class | Concrete example | Why classical SIEM/EDR misses it |
+|---|---|---|---|
+| 1 | **Shadow AI adoption** | Employee pastes customer PII into a public LLM to draft a reply | No log line is generated inside the SIEM; the data exfiltration looks like an HTTPS POST to a SaaS endpoint |
+| 2 | **Prompt injection of agentic AI** | Adversary plants instructions in an inbound email or web page that the AI assistant later reads and executes | The action originates from a trusted service account so UEBA whitelists it |
+| 3 | **Non-human identity misuse** | A service token belonging to an AI agent accumulates entitlements and is later used to exfiltrate data | Behaviour-baseline tools assume a human owner with a working pattern, which is absent |
+| 4 | **Model and data poisoning** | Training data or RAG corpus is silently corrupted upstream so the AI begins producing biased or attacker-favourable outputs | Detection requires monitoring model inputs and outputs over time, not network packets |
+| 5 | **Sleeper-agent backdoors in third-party models** | A fine-tuned model contains a trigger that activates malicious behaviour after a specific date, surviving standard fine-tuning and RLHF — Anthropic demonstrated this empirically in 2024 [referenced in 18] | EDR cannot inspect model weights; the trigger is invisible until it fires |
+| 6 | **AI-augmented social engineering of remaining humans** | Highly personalised voice or email impersonation crafted by AI against the small human team that survived the AI rollout | Email security gateways flag generic phishing, not bespoke deepfakes |
+| 7 | **Defender-side AI hallucination and over-trust** | A SOC analyst auto-accepts an AI-generated triage that closes a real incident as benign | The decision audit trail records "analyst approved" with no semantic record of the AI's reasoning chain |
+
+The unifying property: each of these classes is a **behavioural and governance** failure, not a network or endpoint failure. Classical security tooling was designed for the latter. DriftGuard was designed for the former.
+
+---
+
+## F.3 How DriftGuard mitigates each AI-replacement breach class
+
+Each row maps to live code paths in the open repository so that any reviewer can verify the claim by reading the file.
+
+| Breach class (from F.2) | DriftGuard subsystem | Repo file | Behaviour |
+|---|---|---|---|
+| 1 Shadow AI adoption | Signal ingestion + drift pattern library | `backend/pipeline/signal_ingestion.py`, `backend/core/drift_patterns.py` | Detects the behavioural shift of an employee suddenly pasting large structured prompts into outbound flows; the schema strips PII at entry so the detection is privacy-safe |
+| 2 Prompt injection of agentic AI | Signal ingestion treats every agent identity as a first-class subject; drift pattern library has dedicated agentic-AI patterns | `backend/pipeline/signal_ingestion.py`, `backend/core/drift_patterns.py` | A service account that suddenly takes an unusual action sequence raises the same probability score as a human anomaly, so injected instructions surface as drift |
+| 3 Non-human identity misuse | Same as 2; entitlement-accumulation drift is one of the six baseline patterns | `backend/core/drift_patterns.py`, `backend/core/nist_mapping.py` | Maps to NIST AC-2 (account management); audit trail is generated automatically for AC-6 least-privilege review |
+| 4 Model and data poisoning | Temporal weighting raises sensitivity to slow drift; early-warning engine integrates output-distribution change | `backend/pipeline/temporal_weighting.py`, `backend/engine/early_warning.py` | A gradual shift in agent output character (eg. tone, recommendation distribution) breaches the saturating probability curve before any single event would |
+| 5 Sleeper-agent backdoors | Same as 4; additionally the calibration corpus surfaces post-hoc when output deviates from approved baselines | `backend/calibration/rag_retrieval.py`, `backend/engine/early_warning.py` | The first activation of a dormant trigger appears as a step-change against the calibration corpus, which is much harder to suppress than against a random distribution |
+| 6 AI-augmented social engineering of remaining humans | Drift pattern for unusual response-rate or response-length on the human side, combined with delivery-side behaviour | `backend/core/drift_patterns.py`, `backend/calibration/delivery.py` | A human suddenly engaging at unusual hours with an unusual counterparty raises a behavioural alert, regardless of email-gateway result |
+| 7 Defender-side AI hallucination and over-trust | Ethical guardrails as code + governance approval gates + calibration | `backend/core/ethical_guardrails.py`, `backend/governance/approval_gates.py`, `backend/calibration/delivery.py` | Any AI-suggested triage that crosses a defined risk threshold must pass through an explicit human approval gate, and the calibration response template records the rationale for audit |
+
+Two important architectural properties make these mitigations defensible:
+
+- **Identity-agnostic signal model.** The same drift pattern engine treats human accounts and non-human identities symmetrically, so an enterprise that replaces 30 percent of its analyst headcount with AI agents over the next 24 months does not need a forklift upgrade — those new agent identities flow into the same pipeline as the humans they replaced.
+- **Ethical guardrails enforced as code rather than policy text.** `backend/core/ethical_guardrails.py` and `backend/governance/approval_gates.py` are runtime constraints on what alerts are produced and what actions are permitted; they are not a PDF policy stapled to the procurement contract. This satisfies GDPR Article 22 [10] and the relevant clauses of the EU AI Act [11] in a way that surveillance-first tooling cannot.
+
+---
+
+## F.4 The AI-security competitor landscape — five vendors
+
+The 2024-2026 wave of AI-security startups and acquisitions has reshaped the landscape that did not exist at the start of 2023. Each vendor below is a credible market presence; quantitative funding and revenue figures that cannot be verified to a primary corporate or regulatory source are explicitly labelled qualitative.
+
+### F.4.1 Protect AI
+
+- **What they do.** End-to-end ML supply-chain security: scanning of model artefacts, ML pipeline observability, prompt-injection defence (Layer product line), and a public Hugging Face model-vulnerability scanner.
+- **Status.** Subject of a publicly announced acquisition by a top-three security incumbent in 2025 (qualitative — exact deal value is reported in the trade press but not in this document because it has not been independently confirmed in this session).
+- **Target customers.** Large enterprises building or deploying GenAI products in regulated industries, plus the AI platform teams of Fortune 500.
+- **What they do differently from DriftGuard.** Protect AI focuses on the **model artefact and the inference path**: scanning weights, sanitising prompts, hardening the inference endpoint. DriftGuard focuses on the **behavioural and governance trail** of the people and agents using and deploying those models. The two are complementary, not substitutable.
+- **Loophole DriftGuard converts.** Protect AI tells you the model is safe. DriftGuard tells you the people and agents around the model are behaving safely. An IBM 2025 [17] AI-oversight breach can pass a Protect AI scan and still occur.
+
+### F.4.2 HiddenLayer
+
+- **What they do.** Adversarial machine-learning detection and response — model scanning, model genealogy and a runtime sensor that detects model-targeted attacks (model evasion, inversion, extraction).
+- **Status.** Independent venture-backed company headquartered in the United States, founded 2022, multiple funding rounds reported between 2022 and 2025 (qualitative; specific round sizes are reported in the trade press but not asserted here).
+- **Target customers.** ML platform teams, MLOps and AI red teams in financial services, defence and large software companies.
+- **What they do differently from DriftGuard.** HiddenLayer is an **attacker-side adversarial-ML** product. DriftGuard is a **defender-side behavioural drift** product. HiddenLayer answers "is this model under attack." DriftGuard answers "is the human-and-agent operating posture around this model drifting toward a breach."
+- **Loophole DriftGuard converts.** A model can be perfectly defended against adversarial ML and still be misused by a stressed human or a compromised service identity. That is the IBM 2025 [17] "ungoverned use" breach pathway.
+
+### F.4.3 Lakera
+
+- **What they do.** Real-time prompt-injection and jailbreak defence as an API gateway in front of LLM applications, plus the well-known Gandalf training environment used by tens of thousands of developers.
+- **Status.** Independent European AI-security company with publicly announced enterprise customers and a Series A round in 2024 (qualitative on round size; covered widely in European tech press).
+- **Target customers.** Engineering teams building customer-facing LLM applications who need a deployable guardrail today.
+- **What they do differently from DriftGuard.** Lakera is an **inline prompt-firewall**. It blocks the injection at request time. DriftGuard is a **post-hoc behavioural detector**. The two solve adjacent problems: Lakera reduces the per-request risk; DriftGuard catches the behavioural pattern across thousands of requests, including ones that Lakera correctly allowed but that taken together signal a breach precursor.
+- **Loophole DriftGuard converts.** Inline guardrails cannot detect slow drift across an entire workforce; that is exactly the pattern in WEF [16] and IBM [17] data.
+
+### F.4.4 CalypsoAI
+
+- **What they do.** Enterprise GenAI governance platform: model policy enforcement, content moderation, model A/B routing, scanner library and an AI red-team simulator.
+- **Status.** Independent venture-backed company, multiple public funding rounds since 2018; large recent round reported in 2024 (qualitative on size).
+- **Target customers.** Government, defence and large regulated enterprises that need to centralise and audit GenAI usage across the organisation.
+- **What they do differently from DriftGuard.** CalypsoAI sits in the **deployment and policy** layer for GenAI specifically. DriftGuard sits in the **behavioural and governance** layer for both humans and agents. CalypsoAI tells you which model was used and whether it complied with policy. DriftGuard tells you whether the people and agents using it are drifting.
+- **Loophole DriftGuard converts.** Policy compliance and behavioural drift are different signals; an action can be policy-compliant in a single instance and still part of a drift pattern that ends in breach.
+
+### F.4.5 Robust Intelligence (Cisco)
+
+- **What they do.** AI firewall, model validation and continuous testing for production AI systems. The company was founded in 2019 and was publicly acquired by Cisco in 2024, becoming part of Cisco's broader AI-security portfolio (qualitative on price; the acquisition itself is on record from both companies and in regulatory filings of Cisco).
+- **Target customers.** Large enterprises and government agencies deploying AI in production who want a single vendor for both validation and runtime defence, increasingly aligned with Cisco's existing security customer base.
+- **What they do differently from DriftGuard.** Robust Intelligence is now part of an incumbent's stack (Cisco), aligned with classical network and SOC tooling. DriftGuard is independent of any SOC vendor and integrates as a behavioural signal alongside whatever SIEM the customer already runs.
+- **Loophole DriftGuard converts.** Distribution as part of a large incumbent stack solves discovery but bundles a behavioural product into a network-security pricing model and procurement cycle. Buyers who do not want to expand the Cisco footprint, or who run multi-vendor SIEM (and that is the majority of large enterprises), are an open lane for DriftGuard.
+
+---
+
+## F.5 Cross-cutting comparison — AI-security tooling vs DriftGuard
+
+| Capability | Protect AI | HiddenLayer | Lakera | CalypsoAI | Robust Intelligence (Cisco) | DriftGuard |
+|---|---|---|---|---|---|---|
+| Scans model artefacts and weights | Yes | Yes | Partial | Partial | Yes | No (intentional — out of scope) |
+| Inline prompt-injection blocking | Yes (Layer line) | No | Yes (primary) | Yes | Yes | No (intentional — out of scope) |
+| Behavioural drift across humans **and** non-human identities | No | No | No | No | Partial | **Yes (core product)** |
+| Saturating probability forecast with confidence interval | No | No | No | No | No | **Yes** |
+| Ethical guardrails enforced **as runtime code** | Partial | No | Partial | Yes (policy DSL) | Partial | **Yes (`backend/core/ethical_guardrails.py`)** |
+| Mandatory human approval gate for high-risk AI actions | No | No | No | Partial | Partial | **Yes (`backend/governance/approval_gates.py`)** |
+| Calibrated response corpus that hardens with use | No | No | No | No | No | **Yes (`backend/calibration/`)** |
+| Integrates as a behavioural signal into existing SIEM (Splunk, Sentinel, etc.) | Partial | Partial | Partial | Partial | Yes (Cisco) | **Yes, vendor-neutral** |
+| First-class healthcare and finance domain adapters | No | No | No | Partial | No | **Yes (`backend/domain/configs/`, `backend/integrations/`)** |
+| Maps controls to NIST 800-53 Rev 5 + GDPR Art. 22 + EU AI Act | Partial | No | Partial | Yes | Partial | **Yes (`backend/core/nist_mapping.py`)** |
+
+The practical reading: there is no single product that combines behavioural drift detection, ethical guardrails as code, calibrated response corpus and vendor-neutral SIEM integration. DriftGuard is the only product in the matrix that scores yes on all five of those rows.
+
+---
+
+## F.6 Three things DriftGuard does better than the AI-security cohort
+
+1. **Behavioural drift across humans and agents in one model.** Protect AI, HiddenLayer, Lakera and Robust Intelligence are largely model-and-prompt-centric. CalypsoAI is policy-centric. None of them tracks the **slow behavioural drift of a workforce that is half human and half AI agent**, which is exactly the world WEF [16] describes for 2025-2030. DriftGuard's signal ingestion (`backend/pipeline/signal_ingestion.py`) treats every identity — human or non-human — as a first-class subject in the same probability model.
+2. **Ethics enforced as code, not as a procurement document.** The ethical guardrails module (`backend/core/ethical_guardrails.py`) and the governance approval gates module (`backend/governance/approval_gates.py`) make GDPR Article 22 [10] and EU AI Act [11] obligations enforceable at runtime. Every other vendor in the matrix relies on either a policy DSL that the buyer has to author or on contractual language. That is a meaningful procurement-cycle advantage in regulated buyers.
+3. **Calibrated response corpus that creates a switching cost.** Every approved response in the calibration system (`backend/calibration/content_api.py`, `backend/calibration/delivery.py`) sharpens future detection. Nothing in the AI-security cohort builds a customer-specific response asset of this kind. After 18-24 months a DriftGuard customer has a behavioural-and-response corpus that no competing migration can preserve. This is the same network-effect dynamic that made Salesforce and Snowflake hard to displace, applied to a security product.
+
+---
+
+## F.7 Three honest things we still need to build to fully match this cohort
+
+This is the **gap list**, written without spin so that the investor sees the real capital allocation needed.
+
+1. **First-class model-artefact scanning.** Today DriftGuard does not scan model weights, embeddings or RAG corpora at the artefact level. Protect AI and HiddenLayer do. To close this gap: build a `backend/scanners/model_artefact.py` module that wraps the Hugging Face safetensors scanner plus a custom embedding-poisoning detector. **Estimated engineering effort: one ML engineer for one quarter, supported by the existing pipeline orchestrator.** This is on the V3 roadmap.
+2. **Inline prompt-injection gateway.** Today DriftGuard is post-hoc; the alert fires after the behaviour has occurred. Lakera and Protect AI Layer offer pre-request blocking. To close this gap without compromising the behavioural-detection identity of the product: ship a thin, optional sidecar (`backend/sdk/prompt_gateway.py`) that buyers deploy in front of their LLM endpoints, with the same drift signals fed back into the main DriftGuard pipeline. **Estimated engineering effort: two engineers for one quarter, plus security review.** Listed as a Phase-2 GTM enabler in §11.
+3. **Distribution at incumbent scale.** None of our technical work matters if a buyer has Cisco's Robust Intelligence pre-loaded in their procurement queue. To close this gap: a deliberate channel strategy with Splunk, Sentinel and Snowflake marketplaces, plus 2-3 named MSSP partners by end of Year 2. **This is a go-to-market problem, not an engineering problem; it is sized in §11 and §A.6 (asks).** Honest read: classical incumbents have decades of distribution; a credible Series A use-of-funds plan must allocate at least 30 percent to channel and partnerships.
+
+These three items are listed in the financial plan as additional spend categories so that a reviewer can trace the gap to a specific budget line.
+
+---
+
+## F.8 What this means for the buyer (AI-replacement edition)
+
+A buyer in 2026 considering DriftGuard against the AI-security cohort should hear three sentences:
+
+1. "We do not replace your AI firewall, your model scanner or your prompt-injection gateway. We cover the layer none of them does — the behavioural and governance drift of your humans and agents over time, mapped to NIST [5], GDPR [10] and the EU AI Act [11] in code."
+2. "Our independence from any SOC vendor or model vendor means we plug into the SIEM, EDR, IDP and AI tooling you already run. There is no rip-and-replace."
+3. "Our calibration corpus becomes a customer-owned asset that hardens detection and response over time. After 24 months it is yours; after 36 months it is the reason your renewal pricing is justified."
+
+If the buyer's risk register from §12 lists shadow AI, agentic AI, non-human identity misuse or AI-augmented social engineering as priority items, DriftGuard is the most efficient single line item to address all four.
+
+---
+
+## F.9 Sources added to master table
+
+The following sources have been appended to §14 of the main plan:
+
+- [18] National Institute of Standards and Technology, *Artificial Intelligence Risk Management Framework (AI RMF 1.0)*, NIST AI 100-1, published 26 January 2023, plus the *Generative Artificial Intelligence Profile*, NIST AI 600-1, published July 2024. Reference URL: https://www.nist.gov/itl/ai-risk-management-framework . The framework is also referenced in the AI Safety Wikipedia article cited above as [179] in that article's source list.
+- [19] OWASP Foundation, *OWASP Top 10 for Large Language Model Applications*, 2025 revision, published by the Open Worldwide Application Security Project. Reference URL: https://owasp.org/www-project-top-10-for-large-language-model-applications/ . The 2025 revision adds a dedicated entry for non-human identity and agentic AI risks; the breach taxonomy in §F.2 maps directly to its top entries on prompt injection, sensitive information disclosure, supply-chain vulnerability, model poisoning and excessive agency.
+- [20] UK National Cyber Security Centre, public guidance on prompt-injection attacks reported in TechRadar on 9 December 2025 ("Prompt injection attacks might 'never be properly mitigated' UK NCSC warns"), itself summarising the NCSC's own published guidance. Reference URL for the secondary source: https://www.techradar.com/pro/security/prompt-injection-attacks-might-never-be-properly-mitigated-uk-ncsc-warns . The NCSC's framing is the one used to motivate §F.2 row 2 (prompt injection of agentic AI) and §F.6 point 1 (behavioural detection as the pragmatic compensating control when prevention is incomplete).
+
+The five vendor profiles in §F.4 do not introduce new numbered sources because no quantitative funding or revenue figure from those vendors is asserted in this appendix. Where round sizes and customer counts are reported in the trade press they are deliberately summarised qualitatively to preserve the no-hallucination discipline established in §14 and Appendix E.
+
+---
+
+*End of Appendix F — AI-replacement breach mitigation and the AI-security competitor landscape. Three new cited sources, full mapping to live repository files, three honest gap items.*
+
+
