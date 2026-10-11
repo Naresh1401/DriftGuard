@@ -22,6 +22,32 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+// An alert as the backend returns it; older field names are kept as fallbacks
+type NistControlRef = string | { value?: string }
+interface RawAlert {
+  id?: string
+  alert_id?: string
+  drift_patterns?: { pattern?: string }[]
+  drift_pattern?: string
+  alert_level?: string
+  severity_score?: number
+  severity?: number
+  confidence_score?: number
+  confidence?: number
+  team_id?: string
+  department?: string
+  plain_language_explanation?: string
+  plain_language?: string
+  nist_controls_at_risk?: NistControlRef[]
+  nist_controls?: NistControlRef[]
+  calibration_recommendation?: string
+  recommended_action?: string
+  created_at?: string
+  status?: string
+  acknowledged?: boolean
+  resolved?: boolean
+}
+
 export const api = {
   // Auth
   login: (email: string, password: string) =>
@@ -40,10 +66,10 @@ export const api = {
   // Alerts
   getAlerts: async (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : ''
-    const raw = await request<{ alerts: any[]; total: number }>(`/alerts${qs}`)
+    const raw = await request<{ alerts: RawAlert[]; total: number }>(`/alerts${qs}`)
     return {
       total: raw.total,
-      alerts: raw.alerts.map((a: any) => ({
+      alerts: raw.alerts.map((a) => ({
         alert_id: a.id || a.alert_id,
         drift_pattern: a.drift_patterns?.[0]?.pattern || a.drift_pattern || 'Unknown',
         alert_level: a.alert_level,
@@ -51,7 +77,7 @@ export const api = {
         confidence: a.confidence_score ?? a.confidence ?? 0,
         department: a.team_id || a.department || 'organization',
         plain_language: a.plain_language_explanation || a.plain_language || '',
-        nist_controls: (a.nist_controls_at_risk || a.nist_controls || []).map((c: any) => typeof c === 'string' ? c : c?.value || c),
+        nist_controls: (a.nist_controls_at_risk || a.nist_controls || []).map((c) => typeof c === 'string' ? c : c.value ?? String(c)),
         recommended_action: a.calibration_recommendation || a.recommended_action || 'Review and assess',
         created_at: a.created_at,
         acknowledged: a.status === 'acknowledged' || a.acknowledged || false,

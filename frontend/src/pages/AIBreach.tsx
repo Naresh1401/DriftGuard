@@ -172,8 +172,8 @@ export default function AIBreach() {
       setPatterns(pr.patterns)
       setPlaybooks(pb.playbooks)
       setForecast(fc)
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
@@ -188,8 +188,8 @@ export default function AIBreach() {
       setRisk(await r.json())
       const fc = await fetch(`${API_BASE}/ai-breach/forecast`).then((r) => r.json())
       setForecast(fc)
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
     } finally {
       setScanning(false)
     }

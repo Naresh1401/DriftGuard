@@ -63,7 +63,7 @@ export interface CalibrationResponse {
   severity_range: [number, number]
   organizational_context: string
   response_text: string
-  approval_status: 'pending' | 'approved' | 'rejected'
+  approval_status: 'pending' | 'approved' | 'rejected' | 'revision_requested'
   is_placeholder: boolean
 }
 
