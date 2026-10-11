@@ -28,6 +28,8 @@ import type {
   HealthScore,
   DriftPattern,
   UserRole,
+  WeeklyReportData,
+  NISTRiskData,
 } from '../types'
 import { api } from '../api'
 import {
@@ -160,8 +162,8 @@ export default function Dashboard() {
   const { role, can } = useAuth()
   const [health, setHealth] = useState<HealthScore>(DEMO_HEALTH)
   const [alerts, setAlerts] = useState<Alert[]>(DEMO_ALERTS)
-  const [weeklyData, setWeeklyData] = useState<any>(null)
-  const [nistData, setNistData] = useState<any>(null)
+  const [weeklyData, setWeeklyData] = useState<WeeklyReportData | null>(null)
+  const [nistData, setNistData] = useState<NISTRiskData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -183,7 +185,7 @@ export default function Dashboard() {
           if (weekly) setWeeklyData(weekly)
           if (nist) setNistData(nist)
         }
-      } catch (e) {
+      } catch {
         if (!cancelled) setError('Failed to load dashboard data. Showing demo data.')
       } finally {
         if (!cancelled) setLoading(false)
@@ -230,7 +232,7 @@ export default function Dashboard() {
 /* ══════════════════════════════════════════════════════
    1. ADMINISTRATOR — Full system view + management
    ══════════════════════════════════════════════════════ */
-function AdminDashboard({ health, alerts, weeklyData }: { health: HealthScore; alerts: Alert[]; weeklyData: any; nistData: any }) {
+function AdminDashboard({ health, alerts, weeklyData }: { health: HealthScore; alerts: Alert[]; weeklyData: WeeklyReportData | null; nistData: NISTRiskData | null }) {
   // Build live pattern distribution from weekly data or alerts
   const livePatternDist = weeklyData?.pattern_distribution
     ? Object.entries(weeklyData.pattern_distribution).map(([pattern, count]) => ({ pattern, count: count as number }))
@@ -346,12 +348,12 @@ function AdminDashboard({ health, alerts, weeklyData }: { health: HealthScore; a
 /* ══════════════════════════════════════════════════════
    2. CISO — Risk-centric with NIST + board readiness
    ══════════════════════════════════════════════════════ */
-function CISODashboard({ health, alerts, nistData }: { health: HealthScore; alerts: Alert[]; nistData: any }) {
+function CISODashboard({ health, alerts, nistData }: { health: HealthScore; alerts: Alert[]; nistData: NISTRiskData | null }) {
   const liveNistRisk = nistData?.controls_at_risk?.length
-    ? nistData.controls_at_risk.map((c: any) => ({ control: c.control, risk: c.risk_score || c.alert_count || 1, label: c.control }))
+    ? nistData.controls_at_risk.map((c) => ({ control: c.control, risk: c.risk_score || c.alert_count || 1, label: c.control }))
     : NIST_RISK
 
-  const nistControlsAtRisk = liveNistRisk.filter((c: any) => c.risk >= 3).length
+  const nistControlsAtRisk = liveNistRisk.filter((c) => c.risk >= 3).length
   const boardReadiness = Math.max(0, Math.min(100, Math.round(health.score * 0.8 + (health.active_patterns === 0 ? 20 : 0))))
 
   return (
@@ -390,7 +392,7 @@ function CISODashboard({ health, alerts, nistData }: { health: HealthScore; aler
         <div className="card">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">Control Risk Assessment</h3>
           <div className="divide-y divide-gray-100">
-            {liveNistRisk.map((ctrl: any) => (
+            {liveNistRisk.map((ctrl) => (
               <div key={ctrl.control} className="py-2.5 flex items-center gap-3">
                 <span className="font-mono text-sm font-bold text-drift-700 w-14">{ctrl.control}</span>
                 <span className="text-sm text-gray-600 flex-1 min-w-0 truncate">{ctrl.label}</span>
@@ -479,8 +481,8 @@ function NIArchitectDashboard({ health, alerts }: { health: HealthScore; alerts:
 
   useEffect(() => {
     api.getCalibrationResponses().then(responses => {
-      const pending = responses.filter((r: any) => r.approval_status === 'pending_review' || r.approval_status === 'pending').length
-      const approved = responses.filter((r: any) => r.approval_status === 'approved').length
+      const pending = responses.filter((r) => r.approval_status === 'pending').length
+      const approved = responses.filter((r) => r.approval_status === 'approved').length
       setCalData({ pending, total: responses.length, approved })
     }).catch(() => {})
   }, [])
@@ -560,7 +562,7 @@ function NIArchitectDashboard({ health, alerts }: { health: HealthScore; alerts:
 /* ══════════════════════════════════════════════════════
    4. COMPLIANCE OFFICER — Plain language, regulatory
    ══════════════════════════════════════════════════════ */
-function ComplianceOfficerDashboard({ health, alerts, weeklyData }: { health: HealthScore; alerts: Alert[]; weeklyData: any }) {
+function ComplianceOfficerDashboard({ health, alerts, weeklyData }: { health: HealthScore; alerts: Alert[]; weeklyData: WeeklyReportData | null }) {
   const resolvedThisWeek = weeklyData?.total_alerts || 0
   const complianceScore = health.score >= 80 ? Math.round(health.score * 0.9) : Math.round(health.score * 0.85)
 

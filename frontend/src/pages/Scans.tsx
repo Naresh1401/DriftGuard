@@ -31,7 +31,9 @@ export default function Scans() {
       setHistory(histRes.scans)
       setSchedules(schedRes.schedules)
       if (statusRes.active) setScanning(true)
-    } catch {}
+    } catch {
+      // Leave the lists as they are when the scan API can't be reached
+    }
     setLoading(false)
   }
 
