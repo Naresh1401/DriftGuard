@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from uuid import uuid4
 
 from models import (
@@ -25,6 +25,9 @@ from pipeline.agents import AgentState, DriftPatternAgent, create_all_agents
 from pipeline.classifier import DriftClassifier
 from pipeline.signal_ingestion import SignalIngestionEngine
 from pipeline.temporal_weighting import TemporalWeightingEngine
+
+if TYPE_CHECKING:
+    from langgraph.graph import StateGraph
 
 logger = logging.getLogger(__name__)
 
