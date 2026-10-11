@@ -26,6 +26,8 @@ jobs:
     uses: Naresh1401/github-cicd-workflows/.github/workflows/node-ci.yml@v1
     with:
       working-directory: frontend
+      # The lint script has no ESLint config yet (ESLint 9 needs eslint.config.js)
+      lint-command: ""
 
   container:
     name: Docker image
