@@ -97,6 +97,10 @@ class NI_ContentAPI:
         self._responses[str(response.id)] = response
         return response
 
+    def list_responses(self) -> List[CalibrationResponse]:
+        """All responses in the library, whatever their approval status."""
+        return list(self._responses.values())
+
     def approve_response(
         self, response_id: str, approved_by: str
     ) -> Optional[CalibrationResponse]:

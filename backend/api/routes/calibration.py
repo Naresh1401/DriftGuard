@@ -147,6 +147,16 @@ async def retrieve_response(
     }
 
 
+@router.get("/responses")
+async def list_responses(
+    user: User = Depends(require_role(UserRole.NI_ARCHITECT, UserRole.ADMIN)),
+):
+    """List every calibration response with its approval status."""
+    from main import app_state
+    responses = app_state.content_api.list_responses()
+    return {"responses": [r.model_dump(mode="json") for r in responses]}
+
+
 @router.get("/pending-reviews")
 async def get_pending_reviews(
     user: User = Depends(require_role(UserRole.NI_ARCHITECT, UserRole.ADMIN)),

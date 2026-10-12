@@ -48,6 +48,16 @@ interface RawAlert {
   resolved?: boolean
 }
 
+// The backend names a calibration response's key `id`; the UI uses `response_id`
+type RawCalibrationResponse = Omit<import('./types').CalibrationResponse, 'response_id'> & {
+  id?: string
+  response_id?: string
+}
+
+function toCalibrationResponse(r: RawCalibrationResponse): import('./types').CalibrationResponse {
+  return { ...r, response_id: r.response_id ?? r.id ?? '' }
+}
+
 export const api = {
   // Auth
   login: (email: string, password: string) =>
@@ -61,7 +71,7 @@ export const api = {
   getMe: () => request<{ email: string; full_name: string; role: string; organization: string }>('/auth/me'),
 
   // Health
-  health: () => request<{ status: string }>('/health'),
+  health: () => request<{ status: string; database?: string; vector_db?: string }>('/health'),
 
   // Alerts
   getAlerts: async (params?: Record<string, string>) => {
@@ -124,7 +134,9 @@ export const api = {
 
   // Calibration
   getCalibrationResponses: () =>
-    request<{ pending: import('./types').CalibrationResponse[] }>('/calibration/pending-reviews').then(r => r.pending),
+    request<{ pending: RawCalibrationResponse[] }>('/calibration/pending-reviews').then(r => r.pending.map(toCalibrationResponse)),
+  getAllCalibrationResponses: () =>
+    request<{ responses: RawCalibrationResponse[] }>('/calibration/responses').then(r => r.responses.map(toCalibrationResponse)),
   approveCalibration: (id: string) =>
     request(`/calibration/responses/${id}/approve`, { method: 'POST' }),
   rejectCalibration: (id: string) =>
