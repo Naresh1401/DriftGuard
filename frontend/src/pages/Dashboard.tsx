@@ -20,13 +20,15 @@ import {
 } from 'recharts'
 import { useAuth } from '../auth'
 import type { Permission } from '../auth'
-import { AlertBadge, LoadingSpinner, PatternTag } from '../components/Shared'
+import { AlertBadge, EmptyState, LoadingSpinner, PatternTag } from '../components/Shared'
 import RiskForecastCard from '../components/RiskForecastCard'
 import LiveStream from '../components/LiveStream'
 import type {
   Alert,
+  CalibrationResponse,
   HealthScore,
   DriftPattern,
+  GovernanceAction,
   UserRole,
   WeeklyReportData,
   NISTRiskData,
@@ -40,7 +42,6 @@ import {
   BookOpen,
   CheckCircle,
   Clock,
-  Users,
   Globe,
   Server,
   Eye,
@@ -61,6 +62,15 @@ const PATTERN_COLORS: Record<DriftPattern, string> = {
   Compliance_Theater: '#20c997',
 }
 
+const NIST_LABELS: Record<string, string> = {
+  'AC-2': 'Account Management',
+  'AU-6': 'Audit Review',
+  'IR-6': 'Incident Reporting',
+  'CA-7': 'Continuous Monitoring',
+  'AT-2': 'Awareness Training',
+}
+
+// Demo data is shown only when the dashboard API cannot be reached
 const DEMO_HEALTH: HealthScore = {
   score: 72,
   trend: 'stable',
@@ -97,31 +107,17 @@ const DEMO_ALERTS: Alert[] = [
   },
 ]
 
-const DEMO_PATTERN_DIST = [
-  { pattern: 'Fatigue', count: 12 },
-  { pattern: 'Overconfidence', count: 8 },
-  { pattern: 'Hurry', count: 5 },
-  { pattern: 'Quiet_Fear', count: 3 },
-  { pattern: 'Hoarding', count: 2 },
-  { pattern: 'Compliance_Theater', count: 7 },
-]
+type NistRiskRow = { control: string; risk: number; label: string }
 
-const NIST_RISK = [
-  { control: 'AC-2', risk: 3.2, label: 'Account Management' },
+const DEMO_NIST_RISK: NistRiskRow[] = [
   { control: 'AU-6', risk: 4.1, label: 'Audit Review' },
-  { control: 'IR-6', risk: 2.8, label: 'Incident Reporting' },
   { control: 'CA-7', risk: 3.7, label: 'Continuous Monitoring' },
+  { control: 'AC-2', risk: 3.2, label: 'Account Management' },
+  { control: 'IR-6', risk: 2.8, label: 'Incident Reporting' },
   { control: 'AT-2', risk: 2.4, label: 'Awareness Training' },
 ]
 
-const PATTERN_PIE = [
-  { name: 'Fatigue', value: 28, color: '#ff6b6b' },
-  { name: 'Overconfidence', value: 18, color: '#ff922b' },
-  { name: 'Hurry', value: 15, color: '#fcc419' },
-  { name: 'Quiet Fear', value: 12, color: '#845ef7' },
-  { name: 'Hoarding', value: 8, color: '#339af0' },
-  { name: 'Compliance Theater', value: 19, color: '#20c997' },
-]
+type PatternCount = { pattern: string; count: number }
 
 const ROLE_CONFIG: Record<UserRole, { title: string; subtitle: string; icon: React.ReactNode; accent: string }> = {
   admin: {
@@ -156,6 +152,55 @@ const ROLE_CONFIG: Record<UserRole, { title: string; subtitle: string; icon: Rea
   },
 }
 
+/* ── Data helpers ─────────────────────────────────── */
+
+const loadSystemHealth = () => api.health()
+const loadDomains = () => api.getDomains()
+const loadPendingActions = () => api.getPendingActions()
+const loadCalibration = () => api.getAllCalibrationResponses()
+const loadRiskTrend = () => api.getRiskTrend('enterprise', 14)
+
+// Loads once on mount: undefined while loading, null if the request failed
+function useFetch<T>(load: () => Promise<T>): T | null | undefined {
+  const [data, setData] = useState<T | null | undefined>(undefined)
+  useEffect(() => {
+    let cancelled = false
+    load()
+      .then((d) => { if (!cancelled) setData(d) })
+      .catch(() => { if (!cancelled) setData(null) })
+    return () => { cancelled = true }
+  }, [load])
+  return data
+}
+
+// Weekly report counts cover every alert; fall back to the recent alerts if it failed to load
+function patternDistribution(weekly: WeeklyReportData | null, alerts: Alert[]): PatternCount[] {
+  const counts: Record<string, number> = weekly
+    ? weekly.pattern_distribution
+    : alerts.reduce((acc: Record<string, number>, a) => { acc[a.drift_pattern] = (acc[a.drift_pattern] || 0) + 1; return acc }, {})
+  return Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .map(([pattern, count]) => ({ pattern, count }))
+    .sort((a, b) => b.count - a.count)
+}
+
+// null means the NIST report is unavailable; an empty list means nothing is at risk
+function nistRiskRows(data: NISTRiskData | null, demo: boolean): NistRiskRow[] | null {
+  if (!data) return demo ? DEMO_NIST_RISK : null
+  return data.controls_at_risk
+    .map((c) => ({
+      control: c.control,
+      // max_severity shares the chart's 1-5 scale; alert_count does not
+      risk: Math.min(5, Math.max(0, c.risk_score ?? c.max_severity)),
+      label: NIST_LABELS[c.control] ?? c.control,
+    }))
+    .sort((a, b) => b.risk - a.risk)
+}
+
+function patternColor(pattern: string): string {
+  return PATTERN_COLORS[pattern as DriftPattern] ?? '#94a3b8'
+}
+
 /* ── Main Dashboard ─────────────────────────────── */
 
 export default function Dashboard() {
@@ -165,13 +210,13 @@ export default function Dashboard() {
   const [weeklyData, setWeeklyData] = useState<WeeklyReportData | null>(null)
   const [nistData, setNistData] = useState<NISTRiskData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [demo, setDemo] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     async function load() {
       setLoading(true)
-      setError(null)
+      setDemo(false)
       try {
         const [h, a, weekly, nist] = await Promise.all([
           api.getHealthScore(),
@@ -182,11 +227,11 @@ export default function Dashboard() {
         if (!cancelled) {
           setHealth(h)
           setAlerts(a.alerts)
-          if (weekly) setWeeklyData(weekly)
-          if (nist) setNistData(nist)
+          setWeeklyData(weekly)
+          setNistData(nist)
         }
       } catch {
-        if (!cancelled) setError('Failed to load dashboard data. Showing demo data.')
+        if (!cancelled) setDemo(true)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -198,13 +243,14 @@ export default function Dashboard() {
   if (loading) return <LoadingSpinner />
 
   const cfg = ROLE_CONFIG[role]
+  const patterns = patternDistribution(weeklyData, alerts)
 
   return (
     <div className="space-y-6">
       {/* Error banner */}
-      {error && (
+      {demo && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 flex items-center gap-2">
-          <AlertTriangle size={16} className="shrink-0" /> {error}
+          <AlertTriangle size={16} className="shrink-0" /> Failed to load dashboard data. Showing demo data.
         </div>
       )}
 
@@ -220,10 +266,10 @@ export default function Dashboard() {
       </div>
 
       {/* Role-specific sections */}
-      {role === 'admin' && <AdminDashboard health={health} alerts={alerts} weeklyData={weeklyData} nistData={nistData} />}
-      {role === 'ciso' && <CISODashboard health={health} alerts={alerts} nistData={nistData} />}
-      {role === 'ni_architect' && <NIArchitectDashboard health={health} alerts={alerts} />}
-      {role === 'compliance_officer' && <ComplianceOfficerDashboard health={health} alerts={alerts} weeklyData={weeklyData} />}
+      {role === 'admin' && <AdminDashboard health={health} alerts={alerts} patterns={patterns} />}
+      {role === 'ciso' && <CISODashboard health={health} alerts={alerts} patterns={patterns} nistData={nistData} demo={demo} />}
+      {role === 'ni_architect' && <NIArchitectDashboard alerts={alerts} patterns={patterns} />}
+      {role === 'compliance_officer' && <ComplianceOfficerDashboard health={health} alerts={alerts} patterns={patterns} weeklyData={weeklyData} demo={demo} />}
       {role === 'viewer' && <ViewerDashboard health={health} alerts={alerts} can={can} />}
     </div>
   )
@@ -232,13 +278,13 @@ export default function Dashboard() {
 /* ══════════════════════════════════════════════════════
    1. ADMINISTRATOR — Full system view + management
    ══════════════════════════════════════════════════════ */
-function AdminDashboard({ health, alerts, weeklyData }: { health: HealthScore; alerts: Alert[]; weeklyData: WeeklyReportData | null; nistData: NISTRiskData | null }) {
-  // Build live pattern distribution from weekly data or alerts
-  const livePatternDist = weeklyData?.pattern_distribution
-    ? Object.entries(weeklyData.pattern_distribution).map(([pattern, count]) => ({ pattern, count: count as number }))
-    : alerts.length > 0
-      ? Object.entries(alerts.reduce((acc: Record<string, number>, a) => { acc[a.drift_pattern] = (acc[a.drift_pattern] || 0) + 1; return acc }, {})).map(([pattern, count]) => ({ pattern, count }))
-      : DEMO_PATTERN_DIST
+function AdminDashboard({ health, alerts, patterns }: { health: HealthScore; alerts: Alert[]; patterns: PatternCount[] }) {
+  const system = useFetch(loadSystemHealth)
+  const domains = useFetch(loadDomains)
+  const pending = useFetch(loadPendingActions)
+
+  const pendingCount = (gate: GovernanceAction['gate_type']) =>
+    pending ? pending.filter((p) => p.gate_type === gate).length : '–'
 
   return (
     <>
@@ -259,41 +305,31 @@ function AdminDashboard({ health, alerts, weeklyData }: { health: HealthScore; a
       </div>
 
       {/* System status row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
           <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
             <Server size={16} className="text-purple-500" /> System Status
           </h3>
           <div className="space-y-3">
-            <SystemRow label="Pipeline Engine" status="online" detail="9-node LangGraph active" />
-            <SystemRow label="Signal Ingestion" status="online" detail="24 signals/hr avg" />
-            <SystemRow label="NI Calibration" status="warning" detail="2 responses pending approval" />
-            <SystemRow label="Domain Adapters" status="online" detail="6 domains loaded" />
-            <SystemRow label="Ethical Guardrails" status="online" detail="All checks passing" />
-            <SystemRow label="NIST Mapping" status="online" detail="5 controls tracked" />
-          </div>
-        </div>
-
-        <div className="card">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-            <Users size={16} className="text-blue-500" /> Active Roles
-          </h3>
-          <div className="space-y-2">
-            {([
-              { role: 'Administrator', count: 1, color: 'bg-purple-100 text-purple-700' },
-              { role: 'CISO', count: 1, color: 'bg-red-100 text-red-700' },
-              { role: 'NI Architect', count: 2, color: 'bg-indigo-100 text-indigo-700' },
-              { role: 'Compliance Officer', count: 3, color: 'bg-blue-100 text-blue-700' },
-              { role: 'Viewer', count: 8, color: 'bg-gray-100 text-gray-700' },
-            ]).map((r) => (
-              <div key={r.role} className="flex items-center justify-between py-1.5">
-                <span className={clsx('px-2 py-0.5 rounded text-xs font-medium', r.color)}>{r.role}</span>
-                <span className="text-sm font-medium text-gray-700">{r.count}</span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
-            Total users: <span className="font-semibold text-gray-700">15</span>
+            {system === undefined ? (
+              <SystemRow label="API Server" status="unknown" detail="Checking…" />
+            ) : system === null ? (
+              <SystemRow label="API Server" status="offline" detail="Unreachable" />
+            ) : (
+              <>
+                <SystemRow label="API Server" status="online" detail="Responding" />
+                <SystemRow label="Database" status={system.database === 'connected' ? 'online' : 'offline'}
+                  detail={system.database === 'connected' ? 'Connected' : 'Disconnected'} />
+                <SystemRow label="Vector Database" status={system.vector_db === 'connected' ? 'online' : 'warning'}
+                  detail={system.vector_db === 'connected' ? 'Connected' : 'Not connected'} />
+              </>
+            )}
+            <SystemRow label="Domain Adapters"
+              status={domains === undefined ? 'unknown' : domains === null ? 'offline' : domains.length ? 'online' : 'warning'}
+              detail={domains === undefined ? 'Checking…' : domains === null ? 'Unavailable' : `${domains.length} domain${domains.length === 1 ? '' : 's'} loaded`} />
+            <SystemRow label="Governance Queue"
+              status={pending === undefined ? 'unknown' : pending === null ? 'offline' : pending.length ? 'warning' : 'online'}
+              detail={pending === undefined ? 'Checking…' : pending === null ? 'Unavailable' : pending.length ? `${pending.length} pending approval${pending.length === 1 ? '' : 's'}` : 'Nothing pending'} />
           </div>
         </div>
 
@@ -301,31 +337,32 @@ function AdminDashboard({ health, alerts, weeklyData }: { health: HealthScore; a
           <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
             <Globe size={16} className="text-green-500" /> Domain Coverage
           </h3>
-          <div className="space-y-2">
-            {([
-              { name: 'Healthcare', signals: 14, sensitivity: 'conservative' },
-              { name: 'Enterprise', signals: 18, sensitivity: 'balanced' },
-              { name: 'Finance', signals: 12, sensitivity: 'aggressive' },
-              { name: 'Government', signals: 10, sensitivity: 'conservative' },
-              { name: 'Education', signals: 8, sensitivity: 'balanced' },
-              { name: 'Retail', signals: 6, sensitivity: 'balanced' },
-            ]).map((d) => (
-              <div key={d.name} className="flex items-center justify-between py-1">
-                <span className="text-sm text-gray-700">{d.name}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400">{d.signals} signals</span>
-                  <SensitivityBadge level={d.sensitivity} />
+          {domains === undefined ? (
+            <LoadingSpinner />
+          ) : domains === null ? (
+            <EmptyState message="Domain list is unavailable." />
+          ) : domains.length === 0 ? (
+            <EmptyState message="No domains loaded." />
+          ) : (
+            <div className="space-y-2">
+              {domains.map((d) => (
+                <div key={d.domain} className="flex items-center justify-between py-1">
+                  <span className="text-sm text-gray-700">{d.display_name || d.domain}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400">{d.signal_count} signals</span>
+                    <SensitivityBadge level={d.sensitivity} />
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Charts + alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TrendChart health={health} />
-        <PatternDistChart data={livePatternDist} />
+        <RiskTrendChart />
+        <PatternDistChart data={patterns} />
       </div>
 
       <RecentAlerts alerts={alerts} showNIST showActions />
@@ -336,9 +373,9 @@ function AdminDashboard({ health, alerts, weeklyData }: { health: HealthScore; a
           <Shield size={16} className="text-yellow-500" /> Pending Governance Actions
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <MiniStat label="NI Response Approvals" value={2} icon={<BookOpen size={16} />} color="text-purple-600" />
-          <MiniStat label="NIST Validations" value={1} icon={<Shield size={16} />} color="text-blue-600" />
-          <MiniStat label="Critical Alert Reviews" value={1} icon={<AlertTriangle size={16} />} color="text-red-600" />
+          <MiniStat label="NI Response Approvals" value={pendingCount('ni_response')} icon={<BookOpen size={16} />} color="text-purple-600" />
+          <MiniStat label="NIST Validations" value={pendingCount('nist_mapping')} icon={<Shield size={16} />} color="text-blue-600" />
+          <MiniStat label="Critical Alert Reviews" value={pendingCount('critical_alert')} icon={<AlertTriangle size={16} />} color="text-red-600" />
         </div>
       </div>
     </>
@@ -348,19 +385,19 @@ function AdminDashboard({ health, alerts, weeklyData }: { health: HealthScore; a
 /* ══════════════════════════════════════════════════════
    2. CISO — Risk-centric with NIST + board readiness
    ══════════════════════════════════════════════════════ */
-function CISODashboard({ health, alerts, nistData }: { health: HealthScore; alerts: Alert[]; nistData: NISTRiskData | null }) {
-  const liveNistRisk = nistData?.controls_at_risk?.length
-    ? nistData.controls_at_risk.map((c) => ({ control: c.control, risk: c.risk_score || c.alert_count || 1, label: c.control }))
-    : NIST_RISK
-
-  const nistControlsAtRisk = liveNistRisk.filter((c) => c.risk >= 3).length
+function CISODashboard({ health, alerts, patterns, nistData, demo }: {
+  health: HealthScore; alerts: Alert[]; patterns: PatternCount[]; nistData: NISTRiskData | null; demo: boolean
+}) {
+  const nistRisk = nistRiskRows(nistData, demo)
+  const highest = nistRisk?.[0]
+  const nistControlsAtRisk = nistRisk ? nistRisk.filter((c) => c.risk >= 3).length : 0
   const boardReadiness = Math.max(0, Math.min(100, Math.round(health.score * 0.8 + (health.active_patterns === 0 ? 20 : 0))))
 
   return (
     <>
       {/* Risk KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPICard icon={<Activity size={20} />} label="Risk Score" value={100 - health.score} suffix="/100"
+        <KPICard icon={<Activity size={20} />} label="Risk Score" value={Math.round((100 - health.score) * 10) / 10} suffix="/100"
           color={health.score >= 70 ? 'text-green-600' : 'text-red-600'} />
         <KPICard icon={<AlertTriangle size={20} />} label="Critical Alerts" value={health.critical_alerts} color="text-red-600" />
         <KPICard icon={<Shield size={20} />} label="NIST Controls at Risk" value={nistControlsAtRisk} color="text-orange-500" />
@@ -379,73 +416,56 @@ function CISODashboard({ health, alerts, nistData }: { health: HealthScore; aler
           <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
             <Shield size={16} className="text-red-500" /> NIST SP 800-53 Risk Radar
           </h3>
-          <ResponsiveContainer width="100%" height={260}>
-            <RadarChart data={liveNistRisk}>
-              <PolarGrid />
-              <PolarAngleAxis dataKey="control" tick={{ fontSize: 12 }} />
-              <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10 }} />
-              <Radar name="Risk" dataKey="risk" stroke="#e03131" fill="#e03131" fillOpacity={0.2} />
-            </RadarChart>
-          </ResponsiveContainer>
+          {nistRisk === null ? (
+            <EmptyState message="NIST risk data is unavailable." />
+          ) : nistRisk.length === 0 ? (
+            <EmptyState message="No NIST controls are at risk." />
+          ) : (
+            <ResponsiveContainer width="100%" height={260}>
+              <RadarChart data={nistRisk}>
+                <PolarGrid />
+                <PolarAngleAxis dataKey="control" tick={{ fontSize: 12 }} />
+                <PolarRadiusAxis domain={[0, 5]} tick={{ fontSize: 10 }} />
+                <Radar name="Risk" dataKey="risk" stroke="#e03131" fill="#e03131" fillOpacity={0.2} />
+              </RadarChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         <div className="card">
           <h3 className="text-sm font-semibold text-gray-700 mb-4">Control Risk Assessment</h3>
-          <div className="divide-y divide-gray-100">
-            {liveNistRisk.map((ctrl) => (
-              <div key={ctrl.control} className="py-2.5 flex items-center gap-3">
-                <span className="font-mono text-sm font-bold text-drift-700 w-14">{ctrl.control}</span>
-                <span className="text-sm text-gray-600 flex-1 min-w-0 truncate">{ctrl.label}</span>
-                <div className="w-20 sm:w-32 bg-gray-100 rounded-full h-2 shrink-0">
-                  <div
-                    className={clsx('h-2 rounded-full',
-                      ctrl.risk >= 4 ? 'bg-red-500' : ctrl.risk >= 3 ? 'bg-orange-400' : 'bg-green-500'
-                    )}
-                    style={{ width: `${(ctrl.risk / 5) * 100}%` }}
-                  />
+          {nistRisk === null ? (
+            <EmptyState message="NIST risk data is unavailable." />
+          ) : nistRisk.length === 0 ? (
+            <EmptyState message="No NIST controls are at risk." />
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {nistRisk.map((ctrl) => (
+                <div key={ctrl.control} className="py-2.5 flex items-center gap-3">
+                  <span className="font-mono text-sm font-bold text-drift-700 w-14">{ctrl.control}</span>
+                  <span className="text-sm text-gray-600 flex-1 min-w-0 truncate">{ctrl.label}</span>
+                  <div className="w-20 sm:w-32 bg-gray-100 rounded-full h-2 shrink-0">
+                    <div
+                      className={clsx('h-2 rounded-full',
+                        ctrl.risk >= 4 ? 'bg-red-500' : ctrl.risk >= 3 ? 'bg-orange-400' : 'bg-green-500'
+                      )}
+                      style={{ width: `${(ctrl.risk / 5) * 100}%` }}
+                    />
+                  </div>
+                  <span className={clsx('text-sm font-bold w-8 text-right',
+                    ctrl.risk >= 4 ? 'text-red-600' : ctrl.risk >= 3 ? 'text-orange-500' : 'text-green-600'
+                  )}>{ctrl.risk.toFixed(1)}</span>
                 </div>
-                <span className={clsx('text-sm font-bold w-8 text-right',
-                  ctrl.risk >= 4 ? 'text-red-600' : ctrl.risk >= 3 ? 'text-orange-500' : 'text-green-600'
-                )}>{ctrl.risk.toFixed(1)}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Trend + threat pattern */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TrendChart health={health} />
-        <div className="card">
-          <h3 className="text-sm font-semibold text-gray-700 mb-4">Threat Pattern Distribution</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={(() => {
-                if (!alerts.length) return PATTERN_PIE
-                const dist = alerts.reduce((acc: Record<string, number>, a) => {
-                  const name = a.drift_pattern.replace(/_/g, ' ')
-                  acc[name] = (acc[name] || 0) + 1; return acc
-                }, {})
-                return Object.entries(dist).map(([name, value]) => ({
-                  name, value, color: PATTERN_COLORS[name.replace(/ /g, '_') as DriftPattern] || '#94a3b8'
-                }))
-              })()} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={2}>
-                {(() => {
-                  if (!alerts.length) return PATTERN_PIE.map((e) => <Cell key={e.name} fill={e.color} />)
-                  const dist = alerts.reduce((acc: Record<string, number>, a) => {
-                    const name = a.drift_pattern.replace(/_/g, ' ')
-                    acc[name] = (acc[name] || 0) + 1; return acc
-                  }, {})
-                  return Object.entries(dist).map(([name]) => (
-                    <Cell key={name} fill={PATTERN_COLORS[name.replace(/ /g, '_') as DriftPattern] || '#94a3b8'} />
-                  ))
-                })()}
-              </Pie>
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
+        <RiskTrendChart />
+        <PatternPieChart patterns={patterns} />
       </div>
 
       {/* Executive summary card */}
@@ -455,7 +475,12 @@ function CISODashboard({ health, alerts, nistData }: { health: HealthScore; aler
         </h3>
         <div className="text-sm text-gray-600 space-y-2">
           <p>
-            <strong>Highest risk:</strong> {liveNistRisk.length > 0 ? `${liveNistRisk[0].control} at ${liveNistRisk[0].risk.toFixed(1)}/5` : 'No NIST controls currently at risk'}.
+            <strong>Highest risk:</strong>{' '}
+            {nistRisk === null
+              ? 'NIST risk data is unavailable'
+              : highest
+                ? `${highest.control} (${highest.label}) at ${highest.risk.toFixed(1)}/5`
+                : 'No NIST controls currently at risk'}.
             {health.active_patterns > 0 ? ` ${health.active_patterns} active drift pattern${health.active_patterns > 1 ? 's' : ''} detected.` : ' No active drift patterns.'}
           </p>
           <p>
@@ -476,25 +501,40 @@ function CISODashboard({ health, alerts, nistData }: { health: HealthScore; aler
 /* ══════════════════════════════════════════════════════
    3. NI ARCHITECT — Calibration pipeline focus
    ══════════════════════════════════════════════════════ */
-function NIArchitectDashboard({ health, alerts }: { health: HealthScore; alerts: Alert[] }) {
-  const [calData, setCalData] = useState<{ pending: number; total: number; approved: number }>({ pending: 0, total: 0, approved: 0 })
+function NIArchitectDashboard({ alerts, patterns }: { alerts: Alert[]; patterns: PatternCount[] }) {
+  const responses = useFetch(loadCalibration)
+  const list = responses ?? []
+  const countByStatus = (status: CalibrationResponse['approval_status']) =>
+    list.filter((r) => r.approval_status === status).length
 
-  useEffect(() => {
-    api.getCalibrationResponses().then(responses => {
-      const pending = responses.filter((r) => r.approval_status === 'pending').length
-      const approved = responses.filter((r) => r.approval_status === 'approved').length
-      setCalData({ pending, total: responses.length, approved })
-    }).catch(() => {})
-  }, [])
+  const approved = countByStatus('approved')
+  const pending = countByStatus('pending')
+  const approvalRate = list.length ? Math.round((approved / list.length) * 100) : 0
+
+  const coverage = (Object.keys(PATTERN_COLORS) as DriftPattern[]).map((pattern) => {
+    const forPattern = list.filter((r) => r.drift_pattern === pattern)
+    return {
+      pattern,
+      total: forPattern.length,
+      approved: forPattern.filter((r) => r.approval_status === 'approved').length,
+      pending: forPattern.filter((r) => r.approval_status === 'pending').length,
+    }
+  })
 
   return (
     <>
+      {responses === null && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800 flex items-center gap-2">
+          <AlertTriangle size={16} className="shrink-0" /> Calibration data is unavailable.
+        </div>
+      )}
+
       {/* Calibration KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KPICard icon={<BookOpen size={20} />} label="Total Responses" value={calData.total || 18} color="text-indigo-600" />
-        <KPICard icon={<Clock size={20} />} label="Pending Approval" value={calData.pending} color="text-yellow-600" />
-        <KPICard icon={<CheckCircle size={20} />} label="Approved" value={calData.approved || 14} color="text-green-600" />
-        <KPICard icon={<Zap size={20} />} label="Effectiveness" value={calData.total > 0 ? Math.round((calData.approved / Math.max(calData.total, 1)) * 100) : 64} suffix="%" color="text-drift-700" />
+        <KPICard icon={<BookOpen size={20} />} label="Total Responses" value={list.length} color="text-indigo-600" />
+        <KPICard icon={<Clock size={20} />} label="Pending Approval" value={pending} color="text-yellow-600" />
+        <KPICard icon={<CheckCircle size={20} />} label="Approved" value={approved} color="text-green-600" />
+        <KPICard icon={<Zap size={20} />} label="Approval Rate" value={approvalRate} suffix="%" color="text-drift-700" />
       </div>
 
       {/* Calibration pipeline */}
@@ -504,10 +544,10 @@ function NIArchitectDashboard({ health, alerts }: { health: HealthScore; alerts:
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {([
-            { stage: 'Draft', count: 2, color: 'bg-gray-100 text-gray-700 border-gray-200' },
-            { stage: 'Pending', count: 2, color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
-            { stage: 'Approved', count: 14, color: 'bg-green-50 text-green-700 border-green-200' },
-            { stage: 'Rejected', count: 0, color: 'bg-red-50 text-red-700 border-red-200' },
+            { stage: 'Pending', count: pending, color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+            { stage: 'Revision Requested', count: countByStatus('revision_requested'), color: 'bg-gray-100 text-gray-700 border-gray-200' },
+            { stage: 'Approved', count: approved, color: 'bg-green-50 text-green-700 border-green-200' },
+            { stage: 'Rejected', count: countByStatus('rejected'), color: 'bg-red-50 text-red-700 border-red-200' },
           ]).map((s) => (
             <div key={s.stage} className={clsx('rounded-lg border p-3 text-center', s.color)}>
               <p className="text-2xl font-bold">{s.count}</p>
@@ -521,14 +561,7 @@ function NIArchitectDashboard({ health, alerts }: { health: HealthScore; alerts:
       <div className="card">
         <h3 className="text-sm font-semibold text-gray-700 mb-4">Response Coverage by Pattern</h3>
         <div className="space-y-2">
-          {([
-            { pattern: 'Fatigue' as DriftPattern, total: 4, approved: 3, pending: 1 },
-            { pattern: 'Overconfidence' as DriftPattern, total: 3, approved: 3, pending: 0 },
-            { pattern: 'Hurry' as DriftPattern, total: 3, approved: 2, pending: 1 },
-            { pattern: 'Quiet_Fear' as DriftPattern, total: 3, approved: 3, pending: 0 },
-            { pattern: 'Hoarding' as DriftPattern, total: 2, approved: 2, pending: 0 },
-            { pattern: 'Compliance_Theater' as DriftPattern, total: 3, approved: 1, pending: 0 },
-          ]).map((p) => (
+          {coverage.map((p) => (
             <div key={p.pattern} className="flex items-center gap-3 py-1.5">
               <PatternTag pattern={p.pattern} />
               <div className="flex-1">
@@ -550,8 +583,8 @@ function NIArchitectDashboard({ health, alerts }: { health: HealthScore; alerts:
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TrendChart health={health} />
-        <PatternDistChart data={DEMO_PATTERN_DIST} />
+        <RiskTrendChart />
+        <PatternDistChart data={patterns} />
       </div>
 
       <RecentAlerts alerts={alerts} showNIST={false} showActions={false} />
@@ -562,9 +595,21 @@ function NIArchitectDashboard({ health, alerts }: { health: HealthScore; alerts:
 /* ══════════════════════════════════════════════════════
    4. COMPLIANCE OFFICER — Plain language, regulatory
    ══════════════════════════════════════════════════════ */
-function ComplianceOfficerDashboard({ health, alerts, weeklyData }: { health: HealthScore; alerts: Alert[]; weeklyData: WeeklyReportData | null }) {
-  const resolvedThisWeek = weeklyData?.total_alerts || 0
+function ComplianceOfficerDashboard({ health, alerts, patterns, weeklyData, demo }: {
+  health: HealthScore; alerts: Alert[]; patterns: PatternCount[]; weeklyData: WeeklyReportData | null; demo: boolean
+}) {
+  const resolvedThisWeek = weeklyData?.resolved_this_week ?? 0
   const complianceScore = health.score >= 80 ? Math.round(health.score * 0.9) : Math.round(health.score * 0.85)
+  const findings = alerts
+    .filter((a) => !a.resolved)
+    .sort((a, b) => b.severity - a.severity)
+    .slice(0, 3)
+  const controlsAtRisk: string[] | null = weeklyData
+    ? [...weeklyData.nist_controls_at_risk].sort()
+    : demo
+      ? [...new Set(alerts.flatMap((a) => a.nist_controls))].sort()
+      : null
+  const activePatterns = health.active_patterns
 
   return (
     <>
@@ -585,16 +630,19 @@ function ComplianceOfficerDashboard({ health, alerts, weeklyData }: { health: He
         </h3>
         <div className="text-sm text-gray-600 space-y-3">
           <p>
-            Three organizational drift patterns are active this week. None require individual investigation —
-            all patterns are department-level behavioral indicators.
+            {activePatterns === 0
+              ? 'No organizational drift patterns are active this week.'
+              : `${activePatterns} organizational drift pattern${activePatterns === 1 ? ' is' : 's are'} active this week. None require individual investigation — all patterns are department-level behavioral indicators.`}
           </p>
           <div className="bg-blue-50 rounded-lg p-3 space-y-2">
             <p className="font-medium text-blue-800">Key Findings (Plain Language):</p>
-            <ul className="list-disc list-inside space-y-1 text-blue-700">
-              <li>SOC team review quality is declining — this is a workload problem, not a performance problem</li>
-              <li>Compliance audit scores look good but aren't translating to actual security improvements</li>
-              <li>Engineering team is bypassing approval steps more frequently under deadline pressure</li>
-            </ul>
+            {findings.length === 0 ? (
+              <p className="text-blue-700">No open findings.</p>
+            ) : (
+              <ul className="list-disc list-inside space-y-1 text-blue-700">
+                {findings.map((a) => <li key={a.alert_id}>{a.plain_language}</li>)}
+              </ul>
+            )}
           </div>
           <p className="text-xs text-gray-500 italic">
             All findings are organizational patterns. No individual employees are identified.
@@ -602,37 +650,29 @@ function ComplianceOfficerDashboard({ health, alerts, weeklyData }: { health: He
         </div>
       </div>
 
-      {/* Regulatory alignment */}
+      {/* NIST controls at risk */}
       <div className="card">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Regulatory Alignment Status</h3>
-        <div className="space-y-3">
-          {([
-            { framework: 'NIST SP 800-53', coverage: 92, status: 'compliant' },
-            { framework: 'SOC 2 Type II', coverage: 88, status: 'compliant' },
-            { framework: 'HIPAA Security Rule', coverage: 95, status: 'compliant' },
-            { framework: 'ISO 27001', coverage: 78, status: 'attention' },
-          ]).map((f) => (
-            <div key={f.framework} className="flex items-center gap-4">
-              <span className="text-sm text-gray-700 w-28 sm:w-44 shrink-0">{f.framework}</span>
-              <div className="flex-1 bg-gray-100 rounded-full h-2.5">
-                <div
-                  className={clsx('h-2.5 rounded-full', f.coverage >= 90 ? 'bg-green-500' : f.coverage >= 80 ? 'bg-yellow-400' : 'bg-orange-500')}
-                  style={{ width: `${f.coverage}%` }}
-                />
-              </div>
-              <span className="text-sm font-medium w-12 text-right">{f.coverage}%</span>
-              <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium',
-                f.status === 'compliant' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-              )}>{f.status}</span>
-            </div>
-          ))}
-        </div>
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">NIST SP 800-53 Controls at Risk</h3>
+        {controlsAtRisk === null ? (
+          <p className="text-sm text-gray-500">NIST control data is unavailable.</p>
+        ) : controlsAtRisk.length === 0 ? (
+          <p className="text-sm text-gray-500">No NIST controls are currently at risk.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {controlsAtRisk.map((c) => (
+              <span key={c} className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-orange-50 border border-orange-200 text-sm">
+                <span className="font-mono font-bold text-orange-700">{c}</span>
+                <span className="text-gray-600">{NIST_LABELS[c] ?? ''}</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TrendChart health={health} />
-        <PatternDistChart data={DEMO_PATTERN_DIST} />
+        <RiskTrendChart />
+        <PatternDistChart data={patterns} />
       </div>
 
       <RecentAlerts alerts={alerts} showNIST={false} showActions />
@@ -668,26 +708,30 @@ function ViewerDashboard({ health, alerts }: { health: HealthScore; alerts: Aler
       </div>
 
       {/* Trend chart only */}
-      <TrendChart health={health} />
+      <RiskTrendChart />
 
       {/* Simplified alert list */}
       <div className="card">
         <h3 className="text-sm font-semibold text-gray-700 mb-4">Recent Alerts</h3>
-        <div className="divide-y divide-gray-100">
-          {alerts.map((alert) => (
-            <div key={alert.alert_id} className="py-3 flex items-start gap-4">
-              <div className="pt-0.5"><AlertBadge level={alert.alert_level} /></div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <PatternTag pattern={alert.drift_pattern} />
-                  <span className="text-xs text-gray-500">{alert.department}</span>
+        {alerts.length === 0 ? (
+          <EmptyState message="No recent alerts." />
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {alerts.map((alert) => (
+              <div key={alert.alert_id} className="py-3 flex items-start gap-4">
+                <div className="pt-0.5"><AlertBadge level={alert.alert_level} /></div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <PatternTag pattern={alert.drift_pattern} />
+                    <span className="text-xs text-gray-500">{alert.department}</span>
+                  </div>
+                  <p className="text-sm text-gray-700 line-clamp-2">{alert.plain_language}</p>
                 </div>
-                <p className="text-sm text-gray-700 line-clamp-2">{alert.plain_language}</p>
+                <div className="text-xs text-gray-400 whitespace-nowrap">{formatTimeAgo(alert.created_at)}</div>
               </div>
-              <div className="text-xs text-gray-400 whitespace-nowrap">{formatTimeAgo(alert.created_at)}</div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   )
@@ -695,56 +739,80 @@ function ViewerDashboard({ health, alerts }: { health: HealthScore; alerts: Aler
 
 /* ── Shared sub-components ────────────────────────── */
 
-function TrendChart({ health }: { health?: HealthScore }) {
-  // Generate trend data based on current health score for a realistic view
-  const trendData = Array.from({ length: 14 }, (_, i) => {
-    const baseScore = health?.score ?? 72
-    return {
-      date: new Date(Date.now() - (13 - i) * 86400000).toISOString().split('T')[0],
-      health: Math.max(40, Math.min(100, baseScore + Math.sin(i / 3) * 8 + (Math.random() - 0.5) * 4)),
-    }
-  })
+function RiskTrendChart() {
+  const data = useFetch(loadRiskTrend)
 
   return (
     <div className="card">
-      <h3 className="text-sm font-semibold text-gray-700 mb-4">Health Score Trend (14 days)</h3>
-      <ResponsiveContainer width="100%" height={220}>
-        <AreaChart data={trendData}>
-          <defs>
-            <linearGradient id="healthGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#4263eb" stopOpacity={0.2} />
-              <stop offset="95%" stopColor="#4263eb" stopOpacity={0} />
-            </linearGradient>
-          </defs>
-          <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v: string) => v.slice(5)} />
-          <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
-          <Tooltip />
-          <Area type="monotone" dataKey="health" stroke="#4263eb" fill="url(#healthGrad)" strokeWidth={2} />
-        </AreaChart>
-      </ResponsiveContainer>
+      <h3 className="text-sm font-semibold text-gray-700 mb-4">Breach Risk Trend (14 days)</h3>
+      {data === undefined ? (
+        <LoadingSpinner />
+      ) : data === null ? (
+        <EmptyState message="Trend data is unavailable." />
+      ) : (
+        <ResponsiveContainer width="100%" height={220}>
+          <AreaChart data={data.trend}>
+            <defs>
+              <linearGradient id="riskGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#4263eb" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#4263eb" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(v: string) => v.slice(5)} />
+            <YAxis domain={[0, 'auto']} tick={{ fontSize: 11 }} unit="%" />
+            <Tooltip formatter={(v) => [`${v}%`, 'Breach probability']} />
+            <Area type="monotone" dataKey="breach_probability_pct" stroke="#4263eb" fill="url(#riskGrad)" strokeWidth={2} />
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
     </div>
   )
 }
 
-function PatternDistChart({ data }: { data?: Array<{ pattern: string; count: number }> }) {
-  const chartData = data?.length ? data : DEMO_PATTERN_DIST
-
+function PatternDistChart({ data }: { data: PatternCount[] }) {
   return (
     <div className="card">
       <h3 className="text-sm font-semibold text-gray-700 mb-4">Pattern Distribution</h3>
-      <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={chartData} layout="vertical">
-          <XAxis type="number" tick={{ fontSize: 11 }} />
-          <YAxis dataKey="pattern" type="category" width={100} tick={{ fontSize: 11 }}
-            tickFormatter={(v: string) => v.replace(/_/g, ' ')} />
-          <Tooltip />
-          <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-            {chartData.map((entry) => (
-              <Cell key={entry.pattern} fill={PATTERN_COLORS[entry.pattern as DriftPattern] || '#94a3b8'} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      {data.length === 0 ? (
+        <EmptyState message="No drift patterns detected." />
+      ) : (
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={data} layout="vertical">
+            <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+            <YAxis dataKey="pattern" type="category" width={100} tick={{ fontSize: 11 }}
+              tickFormatter={(v: string) => v.replace(/_/g, ' ')} />
+            <Tooltip />
+            <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+              {data.map((entry) => (
+                <Cell key={entry.pattern} fill={patternColor(entry.pattern)} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      )}
+    </div>
+  )
+}
+
+function PatternPieChart({ patterns }: { patterns: PatternCount[] }) {
+  const slices = patterns.map((p) => ({ name: p.pattern.replace(/_/g, ' '), value: p.count, color: patternColor(p.pattern) }))
+
+  return (
+    <div className="card">
+      <h3 className="text-sm font-semibold text-gray-700 mb-4">Threat Pattern Distribution</h3>
+      {slices.length === 0 ? (
+        <EmptyState message="No drift patterns detected." />
+      ) : (
+        <ResponsiveContainer width="100%" height={220}>
+          <PieChart>
+            <Pie data={slices} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={2}>
+              {slices.map((s) => <Cell key={s.name} fill={s.color} />)}
+            </Pie>
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Tooltip />
+          </PieChart>
+        </ResponsiveContainer>
+      )}
     </div>
   )
 }
@@ -753,31 +821,35 @@ function RecentAlerts({ alerts, showNIST, showActions }: { alerts: Alert[]; show
   return (
     <div className="card">
       <h3 className="text-sm font-semibold text-gray-700 mb-4">Recent Alerts</h3>
-      <div className="divide-y divide-gray-100">
-        {alerts.map((alert) => (
-          <div key={alert.alert_id} className="py-3 flex items-start gap-4">
-            <div className="pt-0.5"><AlertBadge level={alert.alert_level} /></div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <PatternTag pattern={alert.drift_pattern} />
-                <span className="text-xs text-gray-500">{alert.department}</span>
-                {showActions && (
-                  <span className="text-xs text-gray-400">
-                    Severity {alert.severity}/5 · {(alert.confidence * 100).toFixed(0)}%
-                  </span>
+      {alerts.length === 0 ? (
+        <EmptyState message="No recent alerts." />
+      ) : (
+        <div className="divide-y divide-gray-100">
+          {alerts.map((alert) => (
+            <div key={alert.alert_id} className="py-3 flex items-start gap-4">
+              <div className="pt-0.5"><AlertBadge level={alert.alert_level} /></div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <PatternTag pattern={alert.drift_pattern} />
+                  <span className="text-xs text-gray-500">{alert.department}</span>
+                  {showActions && (
+                    <span className="text-xs text-gray-400">
+                      Severity {alert.severity}/5 · {(alert.confidence * 100).toFixed(0)}%
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-700 line-clamp-2">{alert.plain_language}</p>
+                {showNIST && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    NIST: {alert.nist_controls.join(', ') || 'none'} · {alert.recommended_action}
+                  </p>
                 )}
               </div>
-              <p className="text-sm text-gray-700 line-clamp-2">{alert.plain_language}</p>
-              {showNIST && (
-                <p className="text-xs text-gray-500 mt-1">
-                  NIST: {alert.nist_controls.join(', ')} · {alert.recommended_action}
-                </p>
-              )}
+              <div className="text-xs text-gray-400 whitespace-nowrap">{formatTimeAgo(alert.created_at)}</div>
             </div>
-            <div className="text-xs text-gray-400 whitespace-nowrap">{formatTimeAgo(alert.created_at)}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -800,7 +872,7 @@ function KPICard({ icon, label, value, suffix, trend, color }: {
   )
 }
 
-function MiniStat({ label, value, icon, color }: { label: string; value: number; icon: React.ReactNode; color: string }) {
+function MiniStat({ label, value, icon, color }: { label: string; value: number | string; icon: React.ReactNode; color: string }) {
   return (
     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
       <div className={clsx('p-1.5 rounded', color)}>{icon}</div>
@@ -812,13 +884,14 @@ function MiniStat({ label, value, icon, color }: { label: string; value: number;
   )
 }
 
-function SystemRow({ label, status, detail }: { label: string; status: 'online' | 'warning' | 'offline'; detail: string }) {
+function SystemRow({ label, status, detail }: { label: string; status: 'online' | 'warning' | 'offline' | 'unknown'; detail: string }) {
   return (
     <div className="flex items-center gap-3 py-1.5">
       <span className={clsx('w-2 h-2 rounded-full shrink-0',
         status === 'online' && 'bg-green-500',
         status === 'warning' && 'bg-yellow-500',
         status === 'offline' && 'bg-red-500',
+        status === 'unknown' && 'bg-gray-300',
       )} />
       <span className="text-sm text-gray-700 flex-1">{label}</span>
       <span className="text-xs text-gray-400">{detail}</span>

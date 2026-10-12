@@ -89,7 +89,9 @@ const AuthContext = createContext<AuthState | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRoleState] = useState<UserRole>(() => {
-    return (localStorage.getItem('driftguard_role') as UserRole) || 'viewer'
+    // An unknown stored role matches no route and would loop the route guard; fall back to read-only
+    const stored = localStorage.getItem('driftguard_role')
+    return stored && Object.keys(ROLE_PERMISSIONS).includes(stored) ? (stored as UserRole) : 'viewer'
   })
   const [authenticated, setAuthenticated] = useState(() => {
     return !!localStorage.getItem('driftguard_token')

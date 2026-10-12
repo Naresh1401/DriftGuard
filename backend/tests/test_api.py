@@ -187,6 +187,7 @@ class TestReportEndpoints:
         data = resp.json()
         assert "health_score" in data
         assert "total_alerts" in data
+        assert isinstance(data["resolved_this_week"], int)
 
     def test_nist_risk(self, client):
         resp = client.get("/api/v1/reports/nist-risk")
@@ -242,6 +243,15 @@ class TestGovernanceEndpoints:
 # ── Calibration ───────────────────────────────────────
 
 class TestCalibrationEndpoints:
+    def test_list_responses(self, client):
+        resp = client.get("/api/v1/calibration/responses")
+        assert resp.status_code == 200
+        responses = resp.json()["responses"]
+        assert isinstance(responses, list)
+        for r in responses:
+            assert "id" in r
+            assert r["approval_status"] in ("pending", "approved", "rejected", "revision_requested")
+
     def test_pending_reviews(self, client):
         resp = client.get("/api/v1/calibration/pending-reviews")
         assert resp.status_code == 200

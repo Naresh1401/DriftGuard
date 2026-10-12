@@ -306,14 +306,15 @@ class EarlyWarningEngine:
 
     def resolve_alert(
         self,
-        alert_id: UUID,
+        alert_id: UUID | str,
         resolved_by: str,
         acted_upon: bool = False,
     ) -> Optional[Alert]:
         """Resolve an alert. Track whether it was acted upon (feedback loop)."""
         for scope_alerts in self._active_alerts.values():
             for alert in scope_alerts:
-                if alert.id == alert_id:
+                # The API passes the id as a string; a UUID never equals a str
+                if str(alert.id) == str(alert_id):
                     alert.status = (
                         AlertStatus.ACTED_UPON if acted_upon
                         else AlertStatus.RESOLVED
@@ -327,7 +328,7 @@ class EarlyWarningEngine:
 
     def approve_critical_alert(
         self,
-        alert_id: UUID,
+        alert_id: UUID | str,
         approved_by: str,
     ) -> Optional[Alert]:
         """Human approval gate for Critical alerts.
@@ -337,7 +338,7 @@ class EarlyWarningEngine:
         """
         for scope_alerts in self._active_alerts.values():
             for alert in scope_alerts:
-                if alert.id == alert_id:
+                if str(alert.id) == str(alert_id):
                     if alert.alert_level != AlertLevel.CRITICAL:
                         return alert
                     alert.human_approved = True

@@ -319,6 +319,7 @@ export interface WeeklyReportData {
   critical_count: number
   warning_count: number
   watch_count: number
+  resolved_this_week?: number
   pattern_distribution: Record<string, number>
   nist_controls_at_risk: string[]
 }

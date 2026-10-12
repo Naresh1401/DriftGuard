@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import io
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -34,6 +35,12 @@ async def weekly_drift_summary(
         for p in a.drift_patterns:
             pattern_counts[p.pattern.value] = pattern_counts.get(p.pattern.value, 0) + 1
 
+    week_ago = datetime.utcnow() - timedelta(days=7)
+    resolved_this_week = sum(
+        1 for a in all_alerts
+        if a.resolved_at and a.resolved_at.replace(tzinfo=None) >= week_ago
+    )
+
     return {
         "period": "weekly",
         "domain": domain,
@@ -42,6 +49,7 @@ async def weekly_drift_summary(
         "critical_count": sum(1 for a in all_alerts if a.alert_level.value == "Critical"),
         "warning_count": sum(1 for a in all_alerts if a.alert_level.value == "Warning"),
         "watch_count": sum(1 for a in all_alerts if a.alert_level.value == "Watch"),
+        "resolved_this_week": resolved_this_week,
         "pattern_distribution": pattern_counts,
         "nist_controls_at_risk": list(set(
             c.value for a in all_alerts for c in a.nist_controls_at_risk
